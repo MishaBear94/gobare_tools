@@ -6,6 +6,42 @@ import { SessionManager } from '@earendil-works/pi-coding-agent'
 
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+export type PiSessionSecretCode =
+  | 'private_key'
+  | 'gobare_token'
+  | 'github_token'
+  | 'cloud_access_key'
+  | 'provider_key'
+  | 'bearer_token'
+
+// This scans opaque JSONL bytes only. It does not parse, mutate, or include any matched value in
+// diagnostics. The server applies the matching admission policy again before object storage.
+const SECRET_PATTERNS: ReadonlyArray<readonly [PiSessionSecretCode, RegExp]> = [
+  ['private_key', /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
+  ['gobare_token', /\bgbr_pat_[A-Za-z0-9_-]{20,}\b/],
+  ['github_token', /\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}\b/],
+  ['cloud_access_key', /\bAKIA[0-9A-Z]{16}\b/],
+  ['provider_key', /\b(?:sk-(?:ant-)?|AIza)[A-Za-z0-9_.-]{20,}\b/i],
+  ['bearer_token', /\bBearer\s+[A-Za-z0-9_.-]{20,}\b/i],
+]
+
+export function findPiSessionSecret(value: Uint8Array | string): PiSessionSecretCode | null {
+  const text = typeof value === 'string' ? value : Buffer.from(value).toString('utf8')
+  for (const [code, pattern] of SECRET_PATTERNS) {
+    if (pattern.test(text)) return code
+  }
+  return null
+}
+
+function assertPiSessionSecretPolicy(value: Uint8Array | string): void {
+  const finding = findPiSessionSecret(value)
+  if (finding) {
+    throw new Error(
+      `Pi session import blocked by credential policy (${finding}). Remove the credential from the stopped local Pi session and retry.`,
+    )
+  }
+}
+
 export interface InspectedPiSession {
   sourcePath: string
   sessionId: string
@@ -79,6 +115,7 @@ export async function preparePiSession(reference: string): Promise<PreparedPiSes
   try {
     await cp(sourcePath, copied)
     const bytes = await readFile(copied)
+    assertPiSessionSecretPolicy(bytes)
     await Promise.all([mkdir(runtimeDir), mkdir(workspaceDir)])
     const manager = SessionManager.open(copied, runtimeDir, workspaceDir)
     const header = manager.getHeader()
