@@ -6,8 +6,14 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
-const MAX_FILE_BYTES = 32 * 1024 * 1024
 const MAX_ARCHIVE_BYTES = 500 * 1024 * 1024
+// The upload boundary is the complete encrypted archive, not an arbitrary per-file threshold.
+// A project can legitimately contain a single generated asset larger than 32MB.
+const MAX_FILE_BYTES = MAX_ARCHIVE_BYTES
+
+function formatBytes(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
 
 export interface PreparedWorkspace {
   payloadPath: string
@@ -81,7 +87,11 @@ async function copySafeTree(sourceRoot: string, stageRoot: string): Promise<{ fi
         await symlink(target, destination)
         files += 1
       } else if (info.isFile()) {
-        if (info.size > MAX_FILE_BYTES) throw new Error(`Workspace file exceeds 32MB import limit: ${rel}`)
+        if (info.size > MAX_FILE_BYTES) {
+          throw new Error(
+            `Workspace file exceeds the 500MB archive quota: ${rel} (${formatBytes(info.size)}). Remove it or reduce the project payload before importing.`,
+          )
+        }
         if (info.size > 0 && info.size <= 1024 * 1024) {
           const finding = secretFinding(await readFile(source, 'utf8').catch(() => ''))
           if (finding) throw new Error(`Secret scanner blocked ${rel} (${finding}). Remove it from the workspace before importing.`)
@@ -169,8 +179,13 @@ export async function prepareWorkspace(workspace: string): Promise<PreparedWorks
     await mkdir(importDir, { recursive: true })
     await writeFile(join(importDir, 'runtime-manifest.json'), `${JSON.stringify(runtimeManifest(root), null, 2)}\n`, { mode: 0o600 })
     await execFileAsync('tar', ['-czf', archive, '-C', stage, '.'], { maxBuffer: 1024 * 1024 })
+    const archiveStat = await stat(archive)
+    if (archiveStat.size > MAX_ARCHIVE_BYTES) {
+      throw new Error(
+        `Workspace archive exceeds the 500MB import limit (${formatBytes(archiveStat.size)}). Excluded paths are listed in the import policy; remove large generated artifacts and retry.`,
+      )
+    }
     const bytes = await readFile(archive)
-    if (bytes.byteLength > MAX_ARCHIVE_BYTES) throw new Error('Workspace archive exceeds the 500MB import limit.')
     return {
       payloadPath: archive,
       bytes: bytes.byteLength,

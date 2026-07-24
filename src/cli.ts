@@ -16,7 +16,7 @@ function usage(): string {
     '  gobare auth status',
     '  gobare auth logout',
     '  gobare pi inspect --session <pi-session-id-or-file>',
-    '  gobare pi import --session <pi-session-id-or-file> --name <project-name> [--workspace <path>] [--include-env] [--model-binding <id>] [--model <name>]',
+    '  gobare pi import --session <pi-session-id-or-file> --name <project-name> [--workspace <path>] [--include-env]',
     '  gobare pi import resume <transfer-id>',
     '',
     'Pi import accepts a stopped local Pi session. It creates a new Gobare project and does not start a cloud host.',
@@ -110,8 +110,6 @@ async function runPiImport(args: string[]): Promise<void> {
       idempotencyKey,
       projectName: projectName.trim(),
       manifest,
-      ...(argument(args, '--model-binding') ? { modelBindingId: argument(args, '--model-binding') } : {}),
-      ...(argument(args, '--model') ? { model: argument(args, '--model') } : {}),
     })
     const payload = await readFile(prepared.payloadPath)
     const workspacePayload = await readFile(preparedWorkspace.payloadPath)
@@ -124,7 +122,7 @@ async function runPiImport(args: string[]): Promise<void> {
       status: uploaded.status,
       bindingState: created.bindingState,
       next: uploaded.status === 'restorable_paused'
-        ? 'Open the project in Gobare, bind a model if needed, then choose Continue in Gobare.'
+        ? 'Open the project in Gobare and choose Restore project. Connect a model only before your next AI task.'
         : 'Open the project in Gobare to review the import status.',
     })}\n`)
   } finally {

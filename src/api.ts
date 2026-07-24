@@ -78,8 +78,6 @@ export async function createPiImport(
     idempotencyKey: string
     projectName: string
     manifest: PiTransferManifest
-    modelBindingId?: string
-    model?: string
   },
 ): Promise<CreatedPiImport> {
   return apiRequest<CreatedPiImport>(config, '/api/cli/pi-imports', {
