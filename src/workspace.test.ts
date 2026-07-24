@@ -18,6 +18,8 @@ test('captures Git history and worktree state while excluding dotenv files', asy
     await writeFile(join(root, 'tracked.txt'), 'first\n')
     await execFileAsync('git', ['-C', root, 'add', 'tracked.txt'])
     await execFileAsync('git', ['-C', root, 'commit', '-m', 'initial'])
+    const credentialedRemote = 'https://oauth2:example-token-abcdefghijklmnopqrstuvwxyz@git.example.test/team/repository.git'
+    await execFileAsync('git', ['-C', root, 'remote', 'add', 'origin', credentialedRemote])
     await writeFile(join(root, 'tracked.txt'), 'staged\n')
     await execFileAsync('git', ['-C', root, 'add', 'tracked.txt'])
     await writeFile(join(root, 'unstaged.txt'), 'working tree\n')
@@ -30,8 +32,14 @@ test('captures Git history and worktree state while excluding dotenv files', asy
       const { stdout } = await execFileAsync('tar', ['-tzf', prepared.payloadPath])
       assert.match(stdout, /\.gobare-import\/repository\.bundle/)
       assert.match(stdout, /\.gobare-import\/staged\.patch/)
+      assert.match(stdout, /\.gobare-import\/git-head/)
+      assert.match(stdout, /\.gobare-import\/git-branch/)
+      assert.match(stdout, /\.gobare-import\/git-origin/)
       assert.match(stdout, /unstaged\.txt/)
       assert.doesNotMatch(stdout, /\.env/)
+      const { stdout: restoredOrigin } = await execFileAsync('tar', ['-xOzf', prepared.payloadPath, './.gobare-import/git-origin'])
+      assert.equal(restoredOrigin.trim(), 'https://git.example.test/team/repository.git')
+      assert.equal((await readFile(prepared.payloadPath, 'utf8').catch(() => '')).includes(credentialedRemote), false)
       assert.ok((await readFile(prepared.payloadPath)).byteLength > 0)
     } finally {
       await prepared.cleanup()

@@ -62,6 +62,23 @@ function secretFinding(content: string): string | null {
   return null
 }
 
+/** A Git remote is useful recovery metadata, but userinfo may embed a personal access token. */
+function sanitizeGitRemote(value: string): string {
+  const remote = value.trim()
+  if (!remote) return ''
+  try {
+    const url = new URL(remote)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return remote
+    url.username = ''
+    url.password = ''
+    return url.toString()
+  } catch {
+    // SCP-style remotes such as git@github.com:owner/repo.git contain an SSH account name, not a
+    // transferable credential. Leave them as-is; they are never evaluated as shell source.
+    return remote
+  }
+}
+
 async function copySafeTree(sourceRoot: string, stageRoot: string): Promise<{ files: number; untrackedCandidates: string[] }> {
   let files = 0
   const candidates: string[] = []
@@ -135,12 +152,18 @@ async function writeGitState(root: string, stage: string): Promise<PreparedWorks
     git(root, ['diff', '--binary']),
     git(root, ['ls-files', '--others', '--exclude-standard', '-z']),
   ])
+  const safeRemote = sanitizeGitRemote(remote)
   const bundlePath = join(gitDir, 'repository.bundle')
   await execFileAsync('git', ['-C', root, 'bundle', 'create', bundlePath, '--all'])
   await Promise.all([
     writeFile(join(gitDir, 'staged.patch'), staged, { mode: 0o600 }),
     writeFile(join(gitDir, 'unstaged.patch'), unstaged, { mode: 0o600 }),
-    writeFile(join(gitDir, 'git-state.json'), `${JSON.stringify({ head: head.trim(), branch: branch.trim() || null, origin: remote.trim() || null })}\n`, { mode: 0o600 }),
+    // Scalar metadata avoids relying on Node/Python being installed in the restored sandbox.
+    // These files are read as data and never sourced by a shell.
+    writeFile(join(gitDir, 'git-head'), `${head.trim()}\n`, { mode: 0o600 }),
+    writeFile(join(gitDir, 'git-branch'), `${branch.trim()}\n`, { mode: 0o600 }),
+    writeFile(join(gitDir, 'git-origin'), `${safeRemote}\n`, { mode: 0o600 }),
+    writeFile(join(gitDir, 'git-state.json'), `${JSON.stringify({ head: head.trim(), branch: branch.trim() || null, origin: safeRemote || null })}\n`, { mode: 0o600 }),
   ])
   return {
     trackedFiles: 0,
@@ -148,7 +171,7 @@ async function writeGitState(root: string, stage: string): Promise<PreparedWorks
     hasStagedChanges: Boolean(staged),
     hasUnstagedChanges: Boolean(unstaged),
     gitBundleIncluded: true,
-    repoIdentity: remote.trim() || undefined,
+    repoIdentity: safeRemote || undefined,
     baseCommit: head.trim() || undefined,
   }
 }
