@@ -124,6 +124,23 @@ async function copySafeTree(sourceRoot: string, stageRoot: string): Promise<{ fi
   return { files, untrackedCandidates: candidates }
 }
 
+/** Writes a distinct untracked overlay so Git checkout can safely replace tracked source files. */
+async function copyUntrackedOverlay(sourceRoot: string, destinationRoot: string, paths: string[]): Promise<void> {
+  await mkdir(destinationRoot, { recursive: true })
+  for (const rel of paths) {
+    const source = join(sourceRoot, rel)
+    const destination = join(destinationRoot, rel)
+    const info = await lstat(source)
+    await mkdir(dirname(destination), { recursive: true })
+    if (info.isSymbolicLink()) {
+      await symlink(await readlink(source), destination)
+      continue
+    }
+    if (!info.isFile()) throw new Error(`Unsupported untracked workspace entry: ${rel}`)
+    await cp(source, destination, { preserveTimestamps: true, verbatimSymlinks: true })
+  }
+}
+
 async function git(root: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync('git', ['-C', root, ...args], { maxBuffer: 32 * 1024 * 1024 })
   return stdout
@@ -153,8 +170,19 @@ async function writeGitState(root: string, stage: string): Promise<PreparedWorks
     git(root, ['ls-files', '--others', '--exclude-standard', '-z']),
   ])
   const safeRemote = sanitizeGitRemote(remote)
+  const untrackedPaths = untracked
+    .split('\0')
+    .filter(Boolean)
+    .filter((path) => !isExcluded(path))
+  for (const path of untrackedPaths) {
+    if (path.includes('\n') || path.includes('\0')) throw new Error(`Unsupported workspace filename: ${path}`)
+  }
   const bundlePath = join(gitDir, 'repository.bundle')
+  const untrackedOverlay = join(gitDir, 'untracked-overlay')
   await execFileAsync('git', ['-C', root, 'bundle', 'create', bundlePath, '--all'])
+  await copyUntrackedOverlay(stage, untrackedOverlay, untrackedPaths)
+  await execFileAsync('tar', ['-czf', join(gitDir, 'untracked.tgz'), '-C', untrackedOverlay, '.'])
+  await rm(untrackedOverlay, { recursive: true, force: true })
   await Promise.all([
     writeFile(join(gitDir, 'staged.patch'), staged, { mode: 0o600 }),
     writeFile(join(gitDir, 'unstaged.patch'), unstaged, { mode: 0o600 }),
@@ -167,7 +195,7 @@ async function writeGitState(root: string, stage: string): Promise<PreparedWorks
   ])
   return {
     trackedFiles: 0,
-    untrackedFiles: untracked.split('\0').filter(Boolean).length,
+    untrackedFiles: untrackedPaths.length,
     hasStagedChanges: Boolean(staged),
     hasUnstagedChanges: Boolean(unstaged),
     gitBundleIncluded: true,
