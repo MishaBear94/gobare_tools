@@ -55,7 +55,7 @@ sha256sum --check SHA256SUMS
 
 ```bash
 npm install --global \
-  https://github.com/MishaBear94/gobare_tools/releases/download/tools-v0.1.4/gobare-tools-0.1.4.tgz
+  https://github.com/MishaBear94/gobare_tools/releases/download/tools-v0.1.5/gobare-tools-0.1.5.tgz
 gobare --help
 ```
 
