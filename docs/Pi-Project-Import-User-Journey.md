@@ -51,6 +51,16 @@ sha256sum --check SHA256SUMS
 
 ### 2. 安装与确认版本
 
+最简方式是直接从固定版本的 GitHub Release 安装：
+
+```bash
+npm install --global \
+  https://github.com/MishaBear94/gobare_tools/releases/download/tools-v0.1.1/gobare-tools-0.1.1.tgz
+gobare --help
+```
+
+需要先校验下载内容时，使用前一节的手动下载方式：
+
 ```bash
 npm install --global ./gobare-tools-<version>.tgz
 gobare --help
@@ -64,6 +74,8 @@ gh attestation verify gobare-tools-<version>.tgz \
 ```
 
 安装完成后，`gobare` 命令可在任意本地项目目录使用。CLI 不会在安装期间读取 Pi session、项目文件或任何 Gobare 凭证。
+
+不要使用 `npm install -g github:MishaBear94/gobare_tools`。那会从 Git source 而不是已构建的 Release package 安装，无法保证拿到 `dist/cli.js`、固定的 package checksum 或 release provenance。
 
 ## 旅程二：首次配置本机访问
 
