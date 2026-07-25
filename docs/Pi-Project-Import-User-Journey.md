@@ -26,7 +26,46 @@
 4. 你已在 Gobare Console 的 `Settings > Developer access` 创建 CLI access token。
 5. 你想使用的 Gobare 项目名称尚不存在。同一个 organization 内，名称重复会被拒绝，不会覆盖、合并或自动改名已有项目。
 
-## 旅程一：首次配置本机访问
+## 旅程一：从 GitHub 安装 Gobare CLI
+
+Gobare CLI 通过 GitHub Release 发布为 Node.js package。它不是独立原生二进制，因此本机需要 Node.js 22 或更高版本。
+
+### 1. 从 Release 下载并校验
+
+打开 [Gobare Tools Releases](https://github.com/MishaBear94/gobare_tools/releases)，下载同一个 release 中的：
+
+- `gobare-tools-<version>.tgz`
+- `SHA256SUMS`
+
+在下载目录校验 package：
+
+```bash
+# macOS
+shasum -a 256 -c SHA256SUMS
+
+# Linux（通常可使用）
+sha256sum --check SHA256SUMS
+```
+
+校验失败时删除下载文件并重新下载，不要安装。
+
+### 2. 安装与确认版本
+
+```bash
+npm install --global ./gobare-tools-<version>.tgz
+gobare --help
+```
+
+若团队要求验证 GitHub build provenance，可在 package 文件所在目录执行：
+
+```bash
+gh attestation verify gobare-tools-<version>.tgz \
+  --repo MishaBear94/gobare_tools
+```
+
+安装完成后，`gobare` 命令可在任意本地项目目录使用。CLI 不会在安装期间读取 Pi session、项目文件或任何 Gobare 凭证。
+
+## 旅程二：首次配置本机访问
 
 ### 1. 创建 access token
 
@@ -62,7 +101,7 @@ gobare auth logout
 
 这只移除本机保存的引用，不会撤销 Console 中的 token。若设备丢失或不再可信，请在 Console 中撤销该 token。
 
-## 旅程二：导入一个停止的 Pi 项目
+## 旅程三：导入一个停止的 Pi 项目
 
 假设当前目录就是项目目录，本地 Pi session ID 是 `019f8e39-b987-753c-b759-f85b0ba2b5fb`：
 
@@ -108,7 +147,7 @@ gobare pi import \
 
 预检不会创建 Gobare 项目、上传文件、创建 retry journal、唤醒云主机或调用模型。
 
-## 旅程三：迁移应用环境变量
+## 旅程四：迁移应用环境变量
 
 默认情况下，`.env` 文件不会迁移。若项目需要应用运行时环境变量，用户必须显式选择：
 
@@ -126,7 +165,7 @@ gobare pi import \
 
 如果项目中有 `.env*` 文件但没有传入 `--include-env`，CLI 会停止，而不是假装已完成完整迁移。
 
-## 旅程四：打开 Gobare 后自动恢复
+## 旅程五：打开 Gobare 后自动恢复
 
 CLI 成功输出项目 URL 后，直接在浏览器打开它。你不需要点击 `Restore project`，也不需要先配置模型。
 
@@ -141,7 +180,7 @@ CLI 成功输出项目 URL 后，直接在浏览器打开它。你不需要点�
 
 恢复期间可以保持页面打开。完成后页面会自动刷新对话窗口，不需要浏览器刷新。长对话先显示最近一段，向上滚动可按需加载更早历史。
 
-## 旅程五：恢复后的下一步
+## 旅程六：恢复后的下一步
 
 ### 查看和检查项目
 
@@ -161,7 +200,7 @@ CLI 成功输出项目 URL 后，直接在浏览器打开它。你不需要点�
 
 只有在发送下一条新的 AI 任务前，才需要为 Gobare 项目连接模型。连接后直接在项目输入框发送新任务，Agent 会从导入的 Pi native checkpoint 继续，而不是把旧对话重新发送给模型或重放旧工具调用。
 
-## 旅程六：中断、失败与恢复
+## 旅程七：中断、失败与恢复
 
 ### 上传中断
 
@@ -183,7 +222,7 @@ CLI 会读取本机私有 retry journal，重新验证同一个停止的 Pi sess
 
 若 CLI 返回 `project_name_exists`，说明该 organization 已有同名 Gobare 项目。选择一个新的项目名称后重新导入；不要尝试导入到已有项目，因为 Gobare 不支持把两份 Pi state 合并到同一个项目。
 
-## 旅程七：将云端 Pi session 带回本机
+## 旅程八：将云端 Pi session 带回本机
 
 对于已完成的导入项目，可以导出最新 Pi 原生 checkpoint：
 
