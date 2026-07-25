@@ -112,6 +112,35 @@ function readConfirmation(): Promise<string> {
   })
 }
 
+function printPiImportResult(
+  result: {
+    projectId: string
+    projectUrl: string
+    transferId: string
+    status: string
+    bindingState: string
+  },
+  json: boolean,
+): void {
+  const next = result.status === 'resumed'
+    ? 'Gobare is restoring your project. Open it to follow progress; connect a model only before your next AI task.'
+    : 'Open the project in Gobare to review the import status.'
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ ...result, next })}\n`)
+    return
+  }
+  process.stdout.write(
+    [
+      '',
+      'Project created. Cloud restore has started.',
+      `Open Gobare: ${result.projectUrl}`,
+      '',
+      'You can close this terminal now. Gobare restores the workspace and Pi history in the background.',
+      'Connect a model only when you are ready to send the next AI task.',
+    ].join('\n') + '\n',
+  )
+}
+
 export async function confirmPiImport(
   options: {
     json: boolean
@@ -253,16 +282,13 @@ export async function runPiImport(args: string[]): Promise<void> {
     const workspacePayload = await readFile(preparedWorkspace.payloadPath)
     const environmentPayload = preparedEnvironment ? await readFile(preparedEnvironment.payloadPath) : undefined
     const uploaded = await uploadPiImportPayload(config, transferId, payload, workspacePayload, environmentPayload)
-    process.stdout.write(`${JSON.stringify({
+    printPiImportResult({
       projectId: created.projectId,
       projectUrl: created.projectUrl,
       transferId,
       status: uploaded.status,
       bindingState: created.bindingState,
-      next: uploaded.status === 'resumed'
-        ? 'Gobare is restoring your project. Open it to follow progress; connect a model only before your next AI task.'
-        : 'Open the project in Gobare to review the import status.',
-    })}\n`)
+    }, json)
   } finally {
     await Promise.all([prepared.cleanup(), preparedWorkspace?.cleanup(), preparedEnvironment?.cleanup()])
   }
@@ -476,8 +502,19 @@ function isDirectCliInvocation(): boolean {
 }
 
 if (isDirectCliInvocation()) {
-  void main().catch((error) => {
-    process.stderr.write(`${error instanceof Error ? error.message : 'Gobare command failed.'}\n`)
-    process.exitCode = 1
-  })
+  void main()
+    .then(async () => {
+      // Pi's native session reader can keep optional clipboard worker handles alive on macOS
+      // after the session and temporary archive are closed. Flush output, then terminate this
+      // one-shot CLI process so a successful import always returns the user's shell promptly.
+      await Promise.all([
+        new Promise<void>((resolve) => process.stdout.write('', () => resolve())),
+        new Promise<void>((resolve) => process.stderr.write('', () => resolve())),
+      ])
+      process.exit(process.exitCode ?? 0)
+    })
+    .catch((error) => {
+      process.stderr.write(`${error instanceof Error ? error.message : 'Gobare command failed.'}\n`)
+      process.exit(1)
+    })
 }
