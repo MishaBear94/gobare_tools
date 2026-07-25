@@ -45,8 +45,36 @@ export interface CliAuthStatus {
   user: { id: string; email: string | null; name: string | null }
 }
 
+const NETWORK_ATTEMPTS = 3
+
+function waitForRetry(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs))
+}
+
+/**
+ * A CLI import has idempotency keys and resumable payloads, so a short retry is safe when no
+ * HTTP response was received at all. Deliberately do not retry HTTP failures: those carry a
+ * precise server-side policy or validation result that the user needs to see immediately.
+ */
+async function fetchGobare(url: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown
+  for (let attempt = 1; attempt <= NETWORK_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetch(url, init)
+    } catch (error) {
+      lastError = error
+      if (attempt < NETWORK_ATTEMPTS) await waitForRetry(attempt * 300)
+    }
+  }
+  const detail = lastError instanceof Error && lastError.message ? ` (${lastError.message})` : ''
+  throw new Error(
+    `Gobare could not reach ${new URL(url).host} after ${NETWORK_ATTEMPTS} attempts${detail}. ` +
+      'Check your network, then run "gobare pi import resume <transfer-id>" to continue the same import.',
+  )
+}
+
 export async function cliAuthStatus(config: CliAuthConfig): Promise<CliAuthStatus> {
-  const response = await fetch(`${config.server.replace(/\/$/, '')}/api/cli/auth/status`, {
+  const response = await fetchGobare(`${config.server.replace(/\/$/, '')}/api/cli/auth/status`, {
     headers: { Authorization: `Bearer ${config.token}`, Accept: 'application/json' },
   })
   const payload = (await response.json().catch(() => null)) as { error?: string } | CliAuthStatus | null
@@ -55,7 +83,7 @@ export async function cliAuthStatus(config: CliAuthConfig): Promise<CliAuthStatu
 }
 
 async function apiRequest<T>(config: CliAuthConfig, path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${config.server.replace(/\/$/, '')}${path}`, {
+  const response = await fetchGobare(`${config.server.replace(/\/$/, '')}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${config.token}`,
@@ -112,7 +140,7 @@ export async function getPiImport(config: CliAuthConfig, transferId: string): Pr
 
 /** Downloads only the caller's own completed native Pi checkpoint. Never log or cache its bytes. */
 async function downloadPiCheckpoint(config: CliAuthConfig, path: string): Promise<Uint8Array> {
-  const response = await fetch(`${config.server.replace(/\/$/, '')}${path}`, {
+  const response = await fetchGobare(`${config.server.replace(/\/$/, '')}${path}`, {
     headers: { Authorization: `Bearer ${config.token}`, Accept: 'application/x-ndjson' },
   })
   if (!response.ok) {
