@@ -141,6 +141,20 @@ function printPiImportResult(
   )
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function uploadProgressWriter(): (event: { payload: string; completed: number; total: number }) => void {
+  let previous = ''
+  return ({ payload, completed, total }) => {
+    const message = `Uploading ${payload}: ${completed}/${total} part${total === 1 ? '' : 's'} complete`
+    if (message !== previous) process.stderr.write(`${message}\n`)
+    previous = message
+  }
+}
+
 export async function confirmPiImport(
   options: {
     json: boolean
@@ -255,6 +269,7 @@ export async function runPiImport(args: string[]): Promise<void> {
       workspacePath: resolve(workspacePath),
       includeEnvironment: args.includes('--include-env'),
     })
+    if (!json) process.stderr.write('Creating Gobare project...\n')
     const created = await createPiImport(config, {
       transferId,
       idempotencyKey,
@@ -281,7 +296,20 @@ export async function runPiImport(args: string[]): Promise<void> {
     const payload = await readFile(prepared.payloadPath)
     const workspacePayload = await readFile(preparedWorkspace.payloadPath)
     const environmentPayload = preparedEnvironment ? await readFile(preparedEnvironment.payloadPath) : undefined
-    const uploaded = await uploadPiImportPayload(config, transferId, payload, workspacePayload, environmentPayload)
+    if (!json) {
+      process.stderr.write(
+        `Uploading ${formatBytes(payload.byteLength + workspacePayload.byteLength + (environmentPayload?.byteLength ?? 0))} in resumable parts...\n`,
+      )
+    }
+    const uploaded = await uploadPiImportPayload(
+      config,
+      transferId,
+      payload,
+      workspacePayload,
+      environmentPayload,
+      json ? undefined : uploadProgressWriter(),
+    )
+    if (!json) process.stderr.write('Starting cloud restore...\n')
     printPiImportResult({
       projectId: created.projectId,
       projectUrl: created.projectUrl,
@@ -396,12 +424,14 @@ export async function runPiImportResume(args: string[]): Promise<void> {
       workspace: preparedWorkspace,
       environment: preparedEnvironment,
     })
+    if (!args.includes('--json')) process.stderr.write('Resuming Gobare upload...\n')
     const uploaded = await uploadPiImportPayload(
       config,
       transferId,
       await readFile(prepared.payloadPath),
       await readFile(preparedWorkspace.payloadPath),
       preparedEnvironment ? await readFile(preparedEnvironment.payloadPath) : undefined,
+      args.includes('--json') ? undefined : uploadProgressWriter(),
     )
     await savePiImportJournal({ ...journal, ...(existing.projectId ? { projectId: existing.projectId } : {}) })
     process.stdout.write(`${JSON.stringify({

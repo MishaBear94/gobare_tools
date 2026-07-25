@@ -95,7 +95,7 @@ async function apiRequest<T>(config: CliAuthConfig, path: string, init: RequestI
   if (!response.ok) {
     const message = payload && typeof payload === 'object' && 'error' in payload
       ? `${payload.code ? `[${payload.code}] ` : ''}${payload.error}`
-      : 'Gobare CLI request failed.'
+      : `Gobare returned HTTP ${response.status} for ${path}. The server did not provide a safe error response.`
     throw new Error(message)
   }
   return payload as T
@@ -123,14 +123,40 @@ export async function uploadPiImportPayload(
   sessionBytes: Uint8Array,
   workspaceBytes?: Uint8Array,
   environmentBytes?: Uint8Array,
+  onProgress?: (event: { payload: 'Pi history' | 'Project snapshot' | 'Environment'; completed: number; total: number }) => void,
 ): Promise<PiImportStatus> {
-  const form = new FormData()
-  form.set('piSession', new Blob([sessionBytes], { type: 'application/jsonl' }), 'pi-session.jsonl')
-  if (workspaceBytes) form.set('workspace', new Blob([workspaceBytes], { type: 'application/gzip' }), 'workspace.tgz')
-  if (environmentBytes) form.set('environment', new Blob([environmentBytes], { type: 'application/json' }), 'environment.json')
-  return apiRequest<PiImportStatus>(config, `/api/cli/pi-imports/${encodeURIComponent(transferId)}/payload`, {
-    method: 'PUT',
-    body: form,
+  const chunkBytes = 4 * 1024 * 1024
+  const upload = async (
+    kind: 'piSession' | 'workspace' | 'environment',
+    label: 'Pi history' | 'Project snapshot' | 'Environment',
+    bytes: Uint8Array,
+  ) => {
+    const total = Math.max(1, Math.ceil(bytes.byteLength / chunkBytes))
+    for (let index = 0; index < total; index += 1) {
+      const body = bytes.slice(index * chunkBytes, Math.min(bytes.byteLength, (index + 1) * chunkBytes))
+      const checksum = await crypto.subtle.digest('SHA-256', body)
+      const digest = Buffer.from(checksum).toString('hex')
+      await apiRequest<{ received: number; total: number }>(
+        config,
+        `/api/cli/pi-imports/${encodeURIComponent(transferId)}/payload/${kind}/${index}`,
+        {
+          method: 'PUT',
+          headers: {
+            'content-type': 'application/octet-stream',
+            'x-gobare-chunk-count': String(total),
+            'x-gobare-chunk-sha256': digest,
+          },
+          body,
+        },
+      )
+      onProgress?.({ payload: label, completed: index + 1, total })
+    }
+  }
+  await upload('piSession', 'Pi history', sessionBytes)
+  if (workspaceBytes) await upload('workspace', 'Project snapshot', workspaceBytes)
+  if (environmentBytes) await upload('environment', 'Environment', environmentBytes)
+  return apiRequest<PiImportStatus>(config, `/api/cli/pi-imports/${encodeURIComponent(transferId)}/payload/complete`, {
+    method: 'POST',
   })
 }
 
