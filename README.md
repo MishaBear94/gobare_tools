@@ -3,6 +3,10 @@
 Local-only Gobare tooling. This repository owns the `gobare` CLI and must not contain Console,
 server, KeyVault, or cloud session restore logic.
 
+For the complete user-facing flow from a stopped local Pi session to a restored Gobare project,
+including environment variables, automatic cloud restore, retry, and export, see
+[Pi Project Import User Journey](./docs/Pi-Project-Import-User-Journey.md).
+
 ## Development
 
 ```bash
