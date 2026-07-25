@@ -119,24 +119,26 @@ function printPiImportResult(
     transferId: string
     status: string
     bindingState: string
+    projectName: string
   },
   json: boolean,
 ): void {
+  const { projectName, ...machineResult } = result
   const next = result.status === 'resumed'
     ? 'Gobare is restoring your project. Open it to follow progress; connect a model only before your next AI task.'
     : 'Open the project in Gobare to review the import status.'
   if (json) {
-    process.stdout.write(`${JSON.stringify({ ...result, next })}\n`)
+    process.stdout.write(`${JSON.stringify({ ...machineResult, next })}\n`)
     return
   }
   process.stdout.write(
     [
       '',
-      'Project created. Cloud restore has started.',
-      `Open Gobare: ${result.projectUrl}`,
+      `Gobare project named "${projectName}" created.`,
+      `Check the session details in: ${result.projectUrl}`,
       '',
-      'You can close this terminal now. Gobare restores the workspace and Pi history in the background.',
-      'Connect a model only when you are ready to send the next AI task.',
+      'You can close this terminal now. Gobare is restoring the workspace state and Pi history in the cloud environment.',
+      'Before vibe coding in Gobare, remember to set up your preferred LLM model.',
     ].join('\n') + '\n',
   )
 }
@@ -316,6 +318,7 @@ export async function runPiImport(args: string[]): Promise<void> {
       transferId,
       status: uploaded.status,
       bindingState: created.bindingState,
+      projectName: projectName.trim(),
     }, json)
   } finally {
     await Promise.all([prepared.cleanup(), preparedWorkspace?.cleanup(), preparedEnvironment?.cleanup()])
