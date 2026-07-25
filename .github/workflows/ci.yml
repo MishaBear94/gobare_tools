@@ -19,4 +19,32 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+      - id: typecheck
+        run: pnpm typecheck
+      - id: test
+        run: pnpm test
+      - name: Write machine-readable CI report
+        if: always()
+        env:
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+        run: |
+          mkdir -p artifacts
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            const report = {
+              format: "gobare-tools-ci-v1",
+              commitSha: process.env.GITHUB_SHA ?? "unknown",
+              typecheck: process.env.TYPECHECK_OUTCOME ?? "skipped",
+              unitTests: process.env.TEST_OUTCOME ?? "skipped"
+            };
+            writeFileSync("artifacts/ci-report.json", `${JSON.stringify(report)}\n`, { mode: 0o600 });
+          '
+      - name: Upload CI report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gobare-tools-ci-${{ github.sha }}
+          path: artifacts/ci-report.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { cp, lstat, mkdir, mkdtemp, readFile, readdir, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { cp, lstat, mkdir, mkdtemp, readFile, readdir, readlink, rename, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -29,7 +29,29 @@ export interface PreparedWorkspace {
     hasUnstagedChanges: boolean
     gitBundleIncluded: boolean
   }
+  runtime: RuntimeManifest
   cleanup(): Promise<void>
+}
+
+export type RuntimePrepareStep = {
+  id: 'node_pnpm_install' | 'node_npm_ci' | 'node_yarn_install' | 'python_poetry_install' | 'go_mod_download' | 'rust_cargo_fetch'
+  category: 'dependency_install'
+  command: string
+  requiresApproval: true
+}
+
+/**
+ * This is intentionally a small, non-sensitive statement of what was actually found in the
+ * workspace. It is not a copy of package metadata, shell state, dependency cache or command
+ * history. Every suggested operation still requires a separate user approval after restore.
+ */
+export interface RuntimeManifest {
+  format: 'gobare-runtime-manifest-v2'
+  workspaceRoot: '/home/user/workspace'
+  discoveredFiles: string[]
+  declaredScripts: Array<'dev' | 'start' | 'test'>
+  prepare: RuntimePrepareStep[]
+  attention: Array<'node_lockfile_missing' | 'python_lockfile_missing' | 'rust_lockfile_missing' | 'container_build_requires_approval'>
 }
 
 function checksum(bytes: Uint8Array): string {
@@ -181,7 +203,8 @@ async function writeGitState(root: string, stage: string): Promise<PreparedWorks
   const untrackedOverlay = join(gitDir, 'untracked-overlay')
   await execFileAsync('git', ['-C', root, 'bundle', 'create', bundlePath, '--all'])
   await copyUntrackedOverlay(stage, untrackedOverlay, untrackedPaths)
-  await execFileAsync('tar', ['-czf', join(gitDir, 'untracked.tgz'), '-C', untrackedOverlay, '.'])
+  await normalizeArchiveTimes(untrackedOverlay)
+  await createDeterministicArchive(join(gitDir, 'untracked.tgz'), untrackedOverlay)
   await rm(untrackedOverlay, { recursive: true, force: true })
   await Promise.all([
     writeFile(join(gitDir, 'staged.patch'), staged, { mode: 0o600 }),
@@ -204,9 +227,83 @@ async function writeGitState(root: string, stage: string): Promise<PreparedWorks
   }
 }
 
-function runtimeManifest(root: string): Record<string, unknown> {
-  const candidates = ['.nvmrc', '.node-version', '.python-version', 'package.json', 'pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'pyproject.toml', 'poetry.lock', 'requirements.txt', 'go.mod', 'Cargo.toml', 'Cargo.lock', 'Dockerfile', 'docker-compose.yml', 'compose.yml']
-  return { format: 'gobare-runtime-manifest-v1', workspaceRoot: '/home/user/workspace', discoveredFiles: candidates }
+async function exists(path: string): Promise<boolean> {
+  try {
+    return (await lstat(path)).isFile()
+  } catch {
+    return false
+  }
+}
+
+async function declaredPackageScripts(root: string): Promise<Array<'dev' | 'start' | 'test'>> {
+  try {
+    const parsed = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { scripts?: unknown }
+    if (!parsed.scripts || typeof parsed.scripts !== 'object' || Array.isArray(parsed.scripts)) return []
+    const scripts = parsed.scripts as Record<string, unknown>
+    return (['dev', 'start', 'test'] as const).filter((name) => typeof scripts[name] === 'string')
+  } catch {
+    // A malformed package.json is a project problem, not a reason to make a claim about its
+    // runtime. The restored workspace remains usable and the Console will show no Node plan.
+    return []
+  }
+}
+
+async function runtimeManifest(root: string): Promise<RuntimeManifest> {
+  const candidates = [
+    '.nvmrc', '.node-version', '.python-version', 'package.json', 'pnpm-lock.yaml', 'package-lock.json',
+    'yarn.lock', 'pyproject.toml', 'poetry.lock', 'requirements.txt', 'go.mod', 'go.sum', 'Cargo.toml',
+    'Cargo.lock', 'Dockerfile', 'docker-compose.yml', 'compose.yml',
+  ]
+  const discoveredFiles = (await Promise.all(candidates.map(async (file) => ((await exists(join(root, file))) ? file : null)))).filter(
+    (file): file is string => Boolean(file),
+  )
+  const found = new Set(discoveredFiles)
+  const prepare: RuntimePrepareStep[] = []
+  const attention: RuntimeManifest['attention'] = []
+  if (found.has('pnpm-lock.yaml')) prepare.push({ id: 'node_pnpm_install', category: 'dependency_install', command: 'pnpm install --frozen-lockfile --ignore-scripts', requiresApproval: true })
+  else if (found.has('package-lock.json')) prepare.push({ id: 'node_npm_ci', category: 'dependency_install', command: 'npm ci --ignore-scripts', requiresApproval: true })
+  else if (found.has('yarn.lock')) prepare.push({ id: 'node_yarn_install', category: 'dependency_install', command: 'yarn install --frozen-lockfile --ignore-scripts', requiresApproval: true })
+  else if (found.has('package.json')) attention.push('node_lockfile_missing')
+
+  if (found.has('pyproject.toml') && found.has('poetry.lock')) prepare.push({ id: 'python_poetry_install', category: 'dependency_install', command: 'poetry install --sync --no-root', requiresApproval: true })
+  else if (found.has('pyproject.toml') || found.has('requirements.txt')) attention.push('python_lockfile_missing')
+
+  if (found.has('go.mod') && found.has('go.sum')) prepare.push({ id: 'go_mod_download', category: 'dependency_install', command: 'go mod download', requiresApproval: true })
+  if (found.has('Cargo.toml') && found.has('Cargo.lock')) prepare.push({ id: 'rust_cargo_fetch', category: 'dependency_install', command: 'cargo fetch --locked', requiresApproval: true })
+  else if (found.has('Cargo.toml')) attention.push('rust_lockfile_missing')
+  if (found.has('Dockerfile') || found.has('docker-compose.yml') || found.has('compose.yml')) attention.push('container_build_requires_approval')
+
+  return {
+    format: 'gobare-runtime-manifest-v2',
+    workspaceRoot: '/home/user/workspace',
+    discoveredFiles,
+    declaredScripts: await declaredPackageScripts(root),
+    prepare,
+    attention,
+  }
+}
+
+async function createDeterministicArchive(output: string, cwd: string): Promise<void> {
+  const tarPath = `${output}.tar`
+  await execFileAsync('tar', ['-cf', tarPath, '-C', cwd, '.'])
+  await execFileAsync('gzip', ['-n', tarPath])
+  await rename(`${tarPath}.gz`, output)
+}
+
+/** Tar records filesystem mtimes. Normalize generated staging metadata so an unchanged project
+ * produces the same resumable archive on a later CLI invocation. Symlink timestamps are skipped. */
+async function normalizeArchiveTimes(root: string): Promise<void> {
+  const epoch = new Date(0)
+  async function visit(path: string): Promise<void> {
+    const info = await lstat(path)
+    if (info.isDirectory()) {
+      for (const entry of await readdir(path)) await visit(join(path, entry))
+      await utimes(path, epoch, epoch)
+    } else if (info.isFile()) {
+      await utimes(path, epoch, epoch)
+    }
+  }
+  await visit(root)
 }
 
 /**
@@ -228,8 +325,10 @@ export async function prepareWorkspace(workspace: string): Promise<PreparedWorks
       : { trackedFiles: copied.files, untrackedFiles: copied.files, hasStagedChanges: false, hasUnstagedChanges: false, gitBundleIncluded: false }
     const importDir = join(stage, '.gobare-import')
     await mkdir(importDir, { recursive: true })
-    await writeFile(join(importDir, 'runtime-manifest.json'), `${JSON.stringify(runtimeManifest(root), null, 2)}\n`, { mode: 0o600 })
-    await execFileAsync('tar', ['-czf', archive, '-C', stage, '.'], { maxBuffer: 1024 * 1024 })
+    const runtime = await runtimeManifest(root)
+    await writeFile(join(importDir, 'runtime-manifest.json'), `${JSON.stringify(runtime, null, 2)}\n`, { mode: 0o600 })
+    await normalizeArchiveTimes(stage)
+    await createDeterministicArchive(archive, stage)
     const archiveStat = await stat(archive)
     if (archiveStat.size > MAX_ARCHIVE_BYTES) {
       throw new Error(
@@ -245,6 +344,7 @@ export async function prepareWorkspace(workspace: string): Promise<PreparedWorks
       ...(gitState.repoIdentity ? { repoIdentity: gitState.repoIdentity } : {}),
       ...(gitState.baseCommit ? { baseCommit: gitState.baseCommit } : {}),
       summary: { ...gitState, trackedFiles: copied.files },
+      runtime,
       cleanup: () => rm(temp, { recursive: true, force: true }),
     }
   } catch (error) {

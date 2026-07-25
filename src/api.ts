@@ -1,4 +1,5 @@
 import type { CliAuthConfig } from './auth-config.js'
+import type { RuntimeManifest } from './workspace.js'
 
 export interface PiTransferManifest {
   format: 'gobare-pi-transfer-v1'
@@ -14,6 +15,7 @@ export interface PiTransferManifest {
     kind: 'git_patch' | 'snapshot'
     repoIdentity?: string
     baseCommit?: string
+    runtime?: RuntimeManifest
   }
   environment?: { checksum: string; byteLength: number }
 }
@@ -106,4 +108,40 @@ export async function uploadPiImportPayload(
 
 export async function getPiImport(config: CliAuthConfig, transferId: string): Promise<PiImportStatus> {
   return apiRequest<PiImportStatus>(config, `/api/cli/pi-imports/${encodeURIComponent(transferId)}`)
+}
+
+/** Downloads only the caller's own completed native Pi checkpoint. Never log or cache its bytes. */
+async function downloadPiCheckpoint(config: CliAuthConfig, path: string): Promise<Uint8Array> {
+  const response = await fetch(`${config.server.replace(/\/$/, '')}${path}`, {
+    headers: { Authorization: `Bearer ${config.token}`, Accept: 'application/x-ndjson' },
+  })
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: unknown; code?: unknown } | null
+    const message = typeof payload?.error === 'string' ? payload.error : 'Gobare could not export this Pi session.'
+    const code = typeof payload?.code === 'string' ? `[${payload.code}] ` : ''
+    throw new Error(`${code}${message}`)
+  }
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/x-ndjson')) throw new Error('Gobare returned an invalid Pi export response.')
+  return new Uint8Array(await response.arrayBuffer())
+}
+
+export async function downloadPiImportCheckpoint(
+  config: CliAuthConfig,
+  transferId: string,
+): Promise<Uint8Array> {
+  return downloadPiCheckpoint(
+    config,
+    `/api/cli/pi-imports/${encodeURIComponent(transferId)}/export`,
+  )
+}
+
+export async function downloadPiProjectCheckpoint(
+  config: CliAuthConfig,
+  projectId: string,
+): Promise<Uint8Array> {
+  return downloadPiCheckpoint(
+    config,
+    `/api/cli/pi-imports/project/${encodeURIComponent(projectId)}/export`,
+  )
 }
