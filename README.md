@@ -7,6 +7,18 @@ For the complete user-facing flow from a stopped local Pi session to a restored 
 including environment variables, automatic cloud restore, retry, and export, see
 [Pi Project Import User Journey](./docs/Pi-Project-Import-User-Journey.md).
 
+## Agent API
+
+The CLI is one way to reach Gobare. The other is the **Agent API**: create a session, send it
+work, and read what the agent did, from your own code. Its documentation lives here — a
+quickstart, the event and webhook contracts, the required-action loop, the limits, and the
+deliberate differences from OpenAI's Agents API:
+
+**[docs/api](./docs/api/)** · machine-readable reference at `https://api.gobare.dev/v1/openapi.json`
+
+Those pages are published from the Gobare product repository, where they are checked against the
+code they describe. Corrections belong there rather than here.
+
 ## Development
 
 ```bash
@@ -45,7 +57,8 @@ replay, or persist them.
 
 ## Import a stopped Pi project
 
-Create a least-privilege token in Gobare Console under **Settings > Developer access**, then:
+Create a least-privilege token in Gobare Console under **Build > API keys** (**Settings > Developer
+access** in the classic Console), choosing the **CLI import** kind, then:
 
 ```bash
 # Recommended: avoid placing the token in shell history.
