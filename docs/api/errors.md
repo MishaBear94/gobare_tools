@@ -1,0 +1,69 @@
+# Errors
+
+Every failure has the same shape:
+
+```json
+{"error":{"code":"permission_denied",
+          "message":"This token does not have the \"sessions:read\" scope.",
+          "request_id":"859ae087"}}
+```
+
+**Branch on `code`, not on the HTTP status and not on the message.** The status
+is what a proxy needs; the code is what your integration needs. Messages are
+written for people and may be reworded.
+
+`request_id` is also on the `x-request-id` header. Quote it when you ask us
+about a call — it is how we find that exact request in our logs.
+
+## The codes
+
+| Code | Status | Retry | Meaning |
+| --- | --- | --- | --- |
+| `invalid_request` | 400 | no | The request is malformed, or a field is wrong. Includes a body over the size ceiling |
+| `context_length_exceeded` | 400 | no | The conversation is too long for the model |
+| `authentication_error` | 401 | no | No token, or one we do not recognise. A revoked or expired token lands here |
+| `permission_denied` | 403 | no | The token is valid and lacks the scope, which the message names |
+| `not_found` | 404 | no | No such session, turn, artifact, template — or no such endpoint |
+| `conflict` | 409 | maybe | The session is not in a state that allows this. `input.steer` with no turn running is the common one |
+| `queue_full` | 429 | after a wait | This session already holds the maximum queued messages |
+| `rate_limit_exceeded` | 429 | after `Retry-After` | Too many requests, or too many open streams |
+| `project_limit_exceeded` | 429 | **no** | Your organization is at its concurrent-session ceiling. Waiting does not help; delete a session or ask us to raise it |
+| `internal_error` | 500 | yes | We broke. The message is deliberately fixed; the real one is in our logs under your `request_id` |
+| `sandbox_error` | 500 | yes | The workspace failed during the operation |
+| `workspace_recovery_failed` | 500 | no | A workspace could not be restored. The session needs attention rather than a retry |
+| `bridge_incompatible` | 500 | no | The session's sandbox predates a capability you asked for. Create a new session |
+| `provider_error` | 502 | yes | Your model provider failed |
+| `provider_unauthorized` | 502 | no | Your model provider rejected the credential. Fix it in the Console |
+| `sandbox_unavailable` | 503 | yes | The workspace is not reachable right now |
+
+## The three 429s
+
+They share a status and recover differently, which is exactly why the code
+matters more than the status:
+
+- `rate_limit_exceeded` — you are asking too fast. `Retry-After` says how long
+  to wait, and honouring it works. See [limits.md](limits.md).
+- `queue_full` — this *session* is saturated. Wait for its turns to drain, or
+  use another session.
+- `project_limit_exceeded` — you are at the ceiling for concurrent sessions.
+  **Retrying never succeeds.** Delete something or talk to us.
+
+A client that retries all 429s identically will spin forever on the third.
+
+## Internal errors never leak
+
+An unexpected failure is reported as `internal_error` with a fixed message.
+Internal errors routinely carry file paths, SQL and provider responses, and none
+of that belongs in an external response. The real message is in our logs,
+findable by the `request_id` you were handed.
+
+If you see one, it is worth reporting.
+
+## Errors that are not this shape
+
+`/v1` always answers JSON in this envelope, including `404` for an unknown path
+— so a JSON parse failure means you did not reach `/v1` at all. Check the host
+and the `/v1` prefix.
+
+A `413` from an intermediate proxy is likewise not us; our own body ceiling
+answers `invalid_request` with `400`.
