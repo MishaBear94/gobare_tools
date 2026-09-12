@@ -35,6 +35,27 @@ about a call — it is how we find that exact request in our logs.
 | `provider_error` | 502 | yes | Your model provider failed |
 | `provider_unauthorized` | 502 | no | Your model provider rejected the credential. Fix it in the Console |
 | `sandbox_unavailable` | 503 | yes | The workspace is not reachable right now |
+| `directory_unavailable` | 503 | yes | We could not reach the service that knows what your organization owns |
+
+## Refusals worth recognising
+
+Several `invalid_request` refusals exist specifically so a value is never
+accepted and then ignored. Each names what to do:
+
+| Sending | Answer |
+| --- | --- |
+| `environment.repo` with no GitHub connection on the organization | Connect GitHub in the Console, then create the session again |
+| `environment.repo` as a URL | Send `owner/name`; the message shows the corrected form |
+| `environment.branch` | The branch is reported by the clone, not chosen. Read `environment.repo.branch` |
+| An unknown `agent.approval_mode` | Use one of `auto`, `per_step`, `read_only`, `plan`. It is never defaulted for you |
+| A `permission_rules` entry with no valid `decision` | Every rule needs `allow`, `deny` or `ask` |
+| `metadata` past its ceilings, or a non-string value | Nothing is truncated or coerced; fix the value |
+| A `PATCH` with no recognised field | Send `title`, `metadata`, `agent.instructions`, `agent.approval_mode` or `agent.permission_rules` |
+| `agent.instructions` longer than 32000 characters | Refused with both numbers. Never truncated — half a set of instructions looks like a model ignoring them |
+| `agent.instructions` on a workspace older than the feature | `bridge_incompatible`. Delete the session and create a new one |
+
+An `environment.profiles` id belonging to another organization answers
+`not_found`, not `permission_denied` — an id cannot be probed for existence.
 
 ## The three 429s
 

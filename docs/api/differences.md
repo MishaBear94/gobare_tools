@@ -97,8 +97,26 @@ rejected.
 
 ## Smaller things
 
+- **The clone is owed, not done.** `environment.repo` is recorded when the
+  session is created and cloned when its workspace comes up. A 201 means the
+  session exists; `environment.repo.clone_error` is where a failure appears.
+- **`environment.branch` is refused rather than accepted.** The clone reports
+  the branch it landed on; it cannot be told which one to use. Storing the
+  request would be a value that changed nothing.
+- **Environment profiles are bind-only.** Values are never returned and cannot
+  be set through this API.
+
 - **Errors carry a code, not a type.** Sixteen codes, listed in
   [errors.md](errors.md). Three share `429` and recover differently.
+- **There is no client package, and there is a client.** We publish
+  `run-session.ts` to copy rather than a library to install: a package is a
+  second surface to keep in step with the first. It is real code — the
+  end-to-end test runs through the same file — so it cannot quietly stop
+  compiling.
+- **An agent is a saved configuration, not a running thing.** Creating one
+  starts nothing and costs nothing; a session is what runs. Applying an agent
+  copies it, so editing or deleting one never reaches into work already in
+  flight.
 - **Ids are ours.** Session ids are UUIDs; turns are `turn_…`; artifacts are
   `art_5e2b9017c4d63a8f`; webhook subscriptions are `whsub_6c1e40b9a72d58f3`. Do not parse them.
 - **Times are milliseconds since the epoch**, as numbers.

@@ -75,6 +75,151 @@ curl -s -X POST $GOBARE_API/v1/sessions \
 A session is a cloud computer. It is created immediately; its sandbox comes up
 behind it, which is what `environment.state` reports.
 
+### Everything a session can be given
+
+`POST /v1/sessions` takes more than a model. Every field below is optional.
+
+```bash
+curl -s -X POST $GOBARE_API/v1/sessions \
+  -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' \
+  -d '{
+    "agent": {
+      "model": "MiniMax-M3",
+      "instructions": "You maintain the acme/site repo. Prefer small commits. Never touch /infra.",
+      "approval_mode": "read_only",
+      "permission_rules": [{ "decision": "deny", "path": "/etc" }]
+    },
+    "environment": {
+      "repo": "acme/site",
+      "profiles": ["envg_2b7d5e91c0a34f68"]
+    },
+    "metadata": { "tenant": "acme", "run": "42" }
+  }'
+```
+
+| Field | |
+| --- | --- |
+| `agent.model` / `agent.model_credential_id` | Which connected credential to run against. Omitted uses the organization's default |
+| `agent.instructions` | Standing instructions for every turn, up to 32000 characters. Refused if longer, never truncated |
+| `agent.approval_mode` | `auto`, `per_step`, `read_only` or `plan`. Default `auto`. An unknown value is refused, never defaulted |
+| `agent.permission_rules` | Up to 50 rules, each `{decision, tool?, path?, command?, domain?}` where decision is `allow`, `deny` or `ask` |
+| `agent.tools` / `agent.text` | Tools and output shaping — see the OpenAPI document |
+| `environment.repo` | `owner/name`. Cloned when the workspace comes up |
+| `environment.profiles` | Environment profile ids, from `GET /v1/environment-profiles` |
+| `environment.template_id` | A saved configuration to start from |
+| `metadata` | Your own labels: up to 16 keys, 64 characters per key, 512 per value |
+| `input` | An opening message — see below |
+
+`agent.instructions`, `agent.approval_mode`, `agent.permission_rules` and
+`metadata` can also be changed later with `PATCH /v1/sessions/{id}`, which takes
+any combination of those and `title`.
+
+### Working on your own code
+
+```json
+{ "environment": { "repo": "acme/site" } }
+```
+
+Two things about this are worth knowing before you rely on it.
+
+**A 201 does not mean the code is there.** The session is created immediately;
+the clone happens when its workspace comes up, which is later. If it fails, the
+session still starts with an empty workspace and the reason is on the session:
+
+```json
+{ "environment": { "repo": { "full_name": "acme/site", "branch": null,
+                             "clone_error": "Repository not found" } } }
+```
+
+Read `environment.repo.clone_error` before concluding the agent ignored your
+instructions.
+
+**The branch is reported, not chosen.** The clone checks out the repository's
+default branch and tells us which one that was; `environment.repo.branch` is
+that answer. Sending `environment.branch` is refused rather than ignored,
+because storing a value that changes nothing is worse than saying no.
+
+Your organization needs a GitHub connection — Console, **Settings → App
+integrations**. Without one, a request naming a repository is refused up front
+rather than producing a session that can never clone.
+
+### Secrets the agent should have
+
+Environment profiles are named groups of variables, managed in the Console.
+Bind them by id:
+
+```bash
+curl -s $GOBARE_API/v1/environment-profiles -H "Authorization: Bearer $GOBARE_TOKEN"
+```
+
+```json
+{"object":"list","data":[
+  {"object":"environment_profile","id":"envg_2b7d5e91c0a34f68","name":"staging",
+   "is_default":false,"variable_count":4}],"has_more":false,"last_id":"envg_2b7d5e91c0a34f68"}
+```
+
+```json
+{ "environment": { "profiles": ["envg_2b7d5e91c0a34f68"] } }
+```
+
+**Values are never returned by this API**, and there is no endpoint to set
+them. `variable_count` is there so you can recognise the profile you meant.
+Omitting `profiles` inherits the organization's default group; sending an empty
+list binds nothing.
+
+A profile belonging to another organization answers `not_found` rather than a
+permission error, so an id cannot be probed for existence.
+
+### Telling the agent how you work
+
+```json
+{ "agent": { "instructions": "Prefer small commits. Never touch /infra." } }
+```
+
+These sit on top of the product's own rules rather than replacing them, and
+they apply to every turn. Where your instructions and our safety rules
+disagree, ours win — so `instructions` is how you shape an agent's behaviour,
+and `approval_mode` and `permission_rules` below are how you constrain what it
+may actually do. Two different jobs; instructions are not a permission system.
+
+Two things worth knowing before you rely on them:
+
+- **They take effect on the session's next workspace, not mid-turn.** The
+  system prompt is fixed when the agent's session is built. A `PATCH` during a
+  running turn is not ignored — it applies from the next one.
+- **A session older than this feature refuses them.** Setting instructions on a
+  workspace whose runtime predates them answers `bridge_incompatible` rather
+  than accepting the field and running without it. Deleting the session and
+  creating a new one gets you a current workspace.
+
+Send `null` or `""` to clear them.
+
+### How restricted the agent is
+
+```json
+{ "agent": { "approval_mode": "read_only" } }
+```
+
+| Mode | |
+| --- | --- |
+| `auto` | Acts without asking. The default, and what an unattended integration wants |
+| `per_step` | Asks before each step. The approval arrives as a `required_action` of type `approval` |
+| `read_only` | May read and reason, may not write |
+| `plan` | Produces a plan without carrying it out |
+
+`permission_rules` narrows further, and applies in every mode:
+
+```json
+{ "agent": { "permission_rules": [
+  { "decision": "deny",  "path": "/etc" },
+  { "decision": "ask",   "tool": "bash" },
+  { "decision": "allow", "domain": "api.acme.com" }
+] } }
+```
+
+Both are readable back on the session, so what a session enforces is never
+something you have to remember having sent.
+
 ### Creating and prompting in one call
 
 Pass `input` and the session starts working immediately:
@@ -172,55 +317,48 @@ being able to create.
 
 ## The whole thing, in TypeScript
 
+Everything above is one call each. In practice you want the loop: subscribe,
+send, answer whatever the agent asks you, resume if the connection drops. That
+loop is [`run-session.ts`](https://github.com/MishaBear94/gobare_tools/blob/main/docs/api/run-session.ts)
+— copy it into your project and use it:
+
+<!-- gobare:runsession-usage -->
 ```ts
-const API = "https://api.gobare.dev";
-const TOKEN = process.env.GOBARE_TOKEN!;
+import { runSession } from "./run-session"
 
-const call = async (path: string, init: RequestInit = {}) => {
-  const response = await fetch(API + path, {
-    ...init,
-    headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json", ...init.headers },
-  });
-  const body = await response.json();
-  if (!response.ok) throw new Error(`${body.error.code}: ${body.error.message} (${body.error.request_id})`);
-  return body;
-};
+const result = await runSession({
+  baseUrl: "https://api.gobare.dev",
+  token: process.env.GOBARE_TOKEN!,
+  input: "Create /workspace/outputs/report.md about this repo.",
+  session: { agent: { model: "MiniMax-M3" }, environment: { repo: "acme/site" } },
+  handlers: {
+    lookup_order: async (args) => JSON.stringify(await billing.find((args as any).order_id)),
+  },
+  onEvent: (event) => console.log(event.type),
+})
 
-const session = await call("/v1/sessions", {
-  method: "POST",
-  body: JSON.stringify({ agent: { model: "MiniMax-M3" } }),
-});
-
-await call(`/v1/sessions/${session.id}/events`, {
-  method: "POST",
-  headers: { "idempotency-key": crypto.randomUUID() },
-  body: JSON.stringify({
-    events: [{ type: "input.message", content: "Create /workspace/outputs/report.md about this repo." }],
-  }),
-});
-
-// Poll until the turn settles. Streaming is nicer; see events.md.
-const SETTLED = ["completed", "failed", "cancelled", "waiting"];
-let turn;
-do {
-  await new Promise((r) => setTimeout(r, 5000));
-  [turn] = (await call(`/v1/sessions/${session.id}/turns?limit=1`)).data;
-} while (!turn || !SETTLED.includes(turn.status));
-
-if (turn.status !== "completed") throw new Error(`turn ${turn.status}: ${JSON.stringify(turn.error)}`);
-
-const { data: items } = await call(`/v1/sessions/${session.id}/items?limit=100`);
-console.log(items.filter((i) => i.type === "message" && i.role === "assistant").at(-1)?.content);
-
-const { data: artifacts } = await call(`/v1/sessions/${session.id}/artifacts`);
-console.log(artifacts.map((a) => `${a.path} (${a.size_bytes} bytes)`));
-
-await call(`/v1/sessions/${session.id}`, { method: "DELETE" });
+if (result.status !== "completed") throw new Error(`turn ${result.status}: ${result.error?.message}`)
+console.log(result.text)
 ```
+<!-- /gobare:runsession-usage -->
 
-Note the error handling. Every failure carries `error.code`, `error.message` and
-`error.request_id`; branch on the code, and quote the request id when you ask us
-about one. See [errors.md](errors.md).
+It is not a package, on purpose — see [differences.md](differences.md). It is
+also not a transcription: the same file is what `pnpm e2e:v1:minimax` runs
+against production, so it cannot rot without a test going red.
+
+Three things it does that are easy to get wrong by hand, and wrong silently:
+
+- **Subscribes before sending.** The other order loses the opening events
+  whenever the agent starts quickly — which is to say sometimes.
+- **Answers required actions.** Left unanswered, a turn sits in `waiting` until
+  its deadline and then fails for a reason that looks unrelated.
+- **Never sends a thrown handler's message to the model.** A stack trace is an
+  excellent way to put your database host into a model's context, so a failing
+  handler yields a fixed string instead.
+
+And one thing a generated client would not: it **resumes**. A dropped
+connection continues from `Last-Event-ID` rather than starting over or losing
+the middle. See [events.md](events.md).
 
 ## Paging
 
@@ -240,30 +378,67 @@ Every collection pages the same way, so learning it once is enough:
 because these collections are written to while they are read. Page with
 `?after=<last_id>` until `has_more` is false.
 
-## Reusing a configuration
+## Agents: a configuration you can name
 
-If every session you create should start the same way, save the configuration
-once and name it:
+If every session should start the same way, save that configuration once and
+give it a name:
 
 ```bash
-curl -s -X POST $GOBARE_API/v1/environment-templates   -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json'   -d '{"name":"support-bot","tools":[…],"text":{…}}'
+curl -s -X POST $GOBARE_API/v1/agents \
+  -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' \
+  -d '{
+    "name": "support-bot",
+    "model": "MiniMax-M3",
+    "instructions": "You answer support tickets. Never promise a refund.",
+    "tools": [],
+    "text": { "verbosity": "low" }
+  }'
 
-curl -s -X POST $GOBARE_API/v1/sessions   -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json'   -d '{"agent":{"model":"MiniMax-M3"},"environment":{"template_id":"envt_2b7d5e91c0a34f68"}}'
+curl -s -X POST $GOBARE_API/v1/sessions \
+  -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' \
+  -d '{ "agent": { "id": "support-bot" } }'
 ```
 
-The create call answers with the template, including the id it was given:
-`{"object":"environment_template","id":"envt_2b7d5e91c0a34f68","name":"support-bot",…}`.
+The create call answers with the agent and the id it was given:
+`{"object":"agent","id":"agt_2b7d5e91c0a34f68","name":"support-bot",…}`.
 
 `name` is a slug you choose — lowercase letters, digits, dot, dash or
-underscore, up to 64 characters — and `id` is ours. **A session references the
-id, not the name.** Posting the same name again replaces that template in place
-and keeps its id, so a name is a stable handle to re-save against.
+underscore, up to 64 characters, lowercased for you. `id` is ours. A session
+can name either one. Posting the same name again **replaces that agent in
+place** and keeps its id, so a name is a stable handle to re-save against —
+and a replacement really replaces: a field you leave out is removed, not
+carried over from the version before.
 
-The template is **copied, not referenced**. A session keeps working the way it
-was created even after the template changes or is deleted — which is what makes
-a template a starting point rather than remote control over work already
-running. Inline `agent.tools` wins outright over a template rather than merging,
-because a half-merged tool list is ambiguous about which half won.
+An agent needs at least one of `model`, `model_credential_id`, `instructions`,
+`tools` or `text`. A name with nothing behind it would apply as a no-op.
+
+### What an agent overrides, and what overrides an agent
+
+Anything you send inline wins over the agent. How it wins depends on the field,
+and the difference is deliberate:
+
+| Field | |
+| --- | --- |
+| `model`, `model_credential_id`, `instructions` | **Per field.** Overriding the model keeps the agent's instructions. Sending `null` or `""` for instructions clears them for this session rather than falling back to the agent's |
+| `tools`, `text` | **Replaced whole, never merged.** A half-merged tool list is ambiguous about which half won |
+
+### Copied, not referenced
+
+A session keeps working the way it was created after the agent changes or is
+deleted. That is what makes an agent a starting point rather than remote
+control over work already running.
+
+The session does remember which agent made it — `agent.id` on the session, and
+it stays there after that agent is deleted, because it is a record of where the
+session came from rather than a link to something that must still exist.
+
+### If you integrated against `environment-templates`
+
+`/v1/environment-templates` was the earlier name, from before environment
+*profiles* arrived and left two unrelated things both called "environment".
+Those paths still work, against the same rows, and `environment.template_id`
+still names an agent. They are marked deprecated in the OpenAPI document and
+will be removed after one release — move to `/v1/agents` and `agent.id`.
 
 ## Next
 

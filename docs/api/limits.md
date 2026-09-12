@@ -81,6 +81,25 @@ cleans up.
 Files past either ceiling are skipped; the turn still succeeds, because a turn
 that produced good work and a storage problem has still produced good work.
 
+## Metadata
+
+| | Limit |
+| --- | --- |
+| Keys per session | 16 |
+| Key length | 64 characters |
+| Value length | 512 characters |
+
+Values must be strings. A number is refused rather than stringified, and an
+over-long value is refused rather than truncated — a label that comes back
+different from what you sent is worse than one that was never accepted.
+
+## Permission rules
+
+**50 per session**, each with a `decision` of `allow`, `deny` or `ask` and any
+of `tool`, `path`, `command`, `domain` (500 characters each). A rule this API
+cannot read is refused, so an integration never runs on fewer rules than it
+sent.
+
 ## Environment templates
 
 **25 per organization.** Posting a name that already exists replaces it rather
