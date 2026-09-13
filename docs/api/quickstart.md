@@ -105,6 +105,7 @@ curl -s -X POST $GOBARE_API/v1/sessions \
 | `agent.permission_rules` | Up to 50 rules, each `{decision, tool?, path?, command?, domain?}` where decision is `allow`, `deny` or `ask` |
 | `agent.tools` / `agent.text` | Tools and output shaping — see the OpenAPI document |
 | `environment.repo` | `owner/name`. Cloned when the workspace comes up |
+| `environment.files` | Files to put in the workspace — see below |
 | `environment.profiles` | Environment profile ids, from `GET /v1/environment-profiles` |
 | `environment.template_id` | A saved configuration to start from |
 | `metadata` | Your own labels: up to 16 keys, 64 characters per key, 512 per value |
@@ -142,6 +143,65 @@ because storing a value that changes nothing is worse than saying no.
 Your organization needs a GitHub connection — Console, **Settings → App
 integrations**. Without one, a request naming a repository is refused up front
 rather than producing a session that can never clone.
+
+### Handing the session files
+
+Not every job is "work on my repo". When what you have is a CSV, a spec or a
+PDF, send the bytes:
+
+```json
+{
+  "environment": {
+    "files": [
+      { "type": "inline", "path": "/workspace/amounts.csv", "data": "YW1vdW50CjEwCjIwCg==" },
+      { "type": "inline", "path": "notes.md", "data": "IyBOb3Rlcwo=" }
+    ]
+  }
+}
+```
+
+`data` is base64 of the file's bytes. `path` may be absolute under
+`/workspace` or relative to it — `notes.md` above lands at
+`/workspace/notes.md`. A path that resolves outside the workspace is refused,
+and the refusal tells you where it resolved to.
+
+Ceilings are in [limits.md](limits.md): 5 MiB a file, 10 MiB a request, 50
+files. Each applies to the decoded bytes, not the base64.
+
+**A 201 does not mean the files are there** — same as the clone. They are
+written when the workspace comes up, after the clone, so you can drop a config
+file into a repository you also asked for.
+
+**They are written only if not already present.** A sandbox that was paused and
+woken keeps whatever the agent did to those files; one that had to be rebuilt
+gets them again, because they are part of how the session was defined.
+
+There is no `type: "file_id"` and no `type: "url"`. Gobare has no file store to
+reference, and does not fetch addresses on your behalf. For a large input, use
+`environment.repo`.
+
+### Adding files later
+
+The same shape, against a session that is already running:
+
+```bash
+curl -s -X POST $GOBARE_API/v1/sessions/$SESSION/files \
+  -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' \
+  -d "{\"files\":[{\"type\":\"inline\",\"path\":\"data/second.csv\",\"data\":\"$(base64 < second.csv)\"}]}"
+```
+
+The answer is what was written, not an acknowledgement — your next move is
+usually to tell the agent to read it, and you need to know that is safe.
+
+Two differences from `environment.files`:
+
+**It overwrites.** A path that is already there is replaced, because that is
+what you asked for. Seeded files are the opposite: they never overwrite.
+
+**It is not remembered.** A live write is working state, not part of how the
+session was defined, so a sandbox rebuilt from nothing will not have it. A
+paused sandbox keeps it — and a paused session is woken to serve this call
+rather than refusing it.
 
 ### Secrets the agent should have
 
@@ -305,6 +365,18 @@ curl -s $GOBARE_API/v1/sessions/$SESSION/artifacts/$ARTIFACT/content \
   -H "Authorization: Bearer $GOBARE_TOKEN" -o report.md
 ```
 
+When a turn produced more than one file, take them all at once:
+
+```bash
+curl -s "$GOBARE_API/v1/sessions/$SESSION/artifacts/archive" \
+  -H "Authorization: Bearer $GOBARE_TOKEN" | tar -x -C ./out
+```
+
+A tar, streamed. Add `?turn_id=…` to narrow it to one turn, and the entries
+carry the workspace's own paths. Without it you get the whole session, and each
+entry is prefixed with the turn that published it — two turns writing
+`report.md` are two files, and a flat archive would extract as one.
+
 ## 8. Clean up
 
 ```bash
@@ -342,7 +414,7 @@ console.log(result.text)
 ```
 <!-- /gobare:runsession-usage -->
 
-It is not a package, on purpose — see [differences.md](differences.md). It is
+It is not a package, on purpose — see [design-decisions.md](design-decisions.md). It is
 also not a transcription: the same file is what `pnpm e2e:v1:minimax` runs
 against production, so it cannot rot without a test going red.
 

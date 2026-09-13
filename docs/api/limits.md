@@ -29,9 +29,33 @@ The buckets are separate: exhausting session creation does not stop you reading.
 configuration, a webhook URL — and past a megabyte of JSON the request is a
 mistake. Over it you get `invalid_request` with `400`.
 
-If you need the agent to work on a large input, put it in the workspace rather
-than in the request: clone a repository into the session, or have the agent
-fetch it.
+One exception, for the one request that legitimately carries bytes rather than
+text: `POST /v1/sessions` reads up to **16 MiB**, because `environment.files`
+is base64 and base64 is a third larger than what it encodes.
+
+If you need the agent to work on something larger than that, put it in the
+workspace rather than in the request: clone a repository into the session, or
+have the agent fetch it.
+
+## Files you send
+
+`environment.files` at creation, and `POST /v1/sessions/{id}/files` afterwards.
+The same ceilings apply to both.
+
+| | Limit |
+| --- | --- |
+| One file | 5 MiB |
+| One request's total | 10 MiB |
+| Files per request | 50 |
+
+Each ceiling applies to the *decoded* bytes, not the base64 string. Over any of
+them the request is refused with `invalid_request` — nothing is truncated, and
+no session is left behind for you to clean up.
+
+Seeded files are written into the workspace when it comes up, **if they are not
+already there**. A sandbox that was paused and woken keeps the agent's edits; a
+sandbox that had to be rebuilt gets the files again, because they are part of
+how the session was defined. They are deleted with the session.
 
 ## Event streams
 

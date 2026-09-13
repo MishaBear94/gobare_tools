@@ -11,11 +11,17 @@ API and is what the Console uses.
 | [quickstart.md](quickstart.md) | First time. Token to completed turn, in one page |
 | [events.md](events.md) | You want to watch a session instead of polling it |
 | [webhooks.md](webhooks.md) | You want to be told rather than to watch |
+| [tools.md](tools.md) | You want to give the agent your functions, or an MCP server |
 | [required-actions.md](required-actions.md) | You want the agent to call *your* code |
 | [idempotency.md](idempotency.md) | Your caller retries, and you need it not to act twice |
 | [errors.md](errors.md) | Something returned a code you have not seen |
 | [limits.md](limits.md) | You are planning load, or you got a 429 |
-| [differences.md](differences.md) | You are porting from OpenAI's Agents API |
+| [design-decisions.md](design-decisions.md) | You want to know why the API behaves as it does |
+
+Those pages describe the parts. [Guides](guides/README.md) put them together:
+six scenarios — long-running work, structured extraction, approvals, dispatch
+from your own service, showing the agent's work live, and moving between model
+providers — each written as a sequence you can copy.
 
 The machine-readable reference is `GET /v1/openapi.json` — OpenAPI 3.1, served
 without authentication because it describes the API rather than holding data in
@@ -29,10 +35,12 @@ code it describes — ceilings against the constants that enforce them, error
 codes against their statuses, both event vocabularies — so a page cannot
 quietly drift from the API.
 
-The copy published at
+These pages are published as a site at
+[docs.gobare.dev](https://docs.gobare.dev), built from this directory by
+`deploy/publish-docs-site.sh`. A copy of the markdown also goes to
 [gobare_tools](https://github.com/MishaBear94/gobare_tools/tree/main/docs/api)
-is made by `scripts/publish-api-docs.sh`, which refuses to run if that check
-does not pass.
+via `scripts/publish-api-docs.sh`, which refuses to run if the check above does
+not pass.
 
 ## What this is not
 

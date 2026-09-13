@@ -97,3 +97,10 @@ Streaming is not required. `GET /v1/sessions/{id}/turns` and
 `GET /v1/sessions/{id}/items` are the same facts, and a poll every few seconds
 is a perfectly reasonable integration — it just costs more requests, and
 requests are rate limited.
+
+## `mcp.unavailable`
+
+An MCP server you declared would not connect and was skipped. Carries `server`
+and `reason`. Not an error: the turn continues without that server's tools,
+which is what `required: false` asks for. See [tools.md](tools.md) if you would
+rather it failed.

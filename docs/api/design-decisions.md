@@ -1,11 +1,9 @@
-# Differences from OpenAI's Agents API
+# Design decisions
 
-This API is conceptually parallel to OpenAI's Agents API, not wire-compatible
-with it. If you are porting, the resources will feel familiar — sessions, turns,
-items, events, required actions — and the following seven things are
-deliberately different.
-
-They are listed because an undocumented divergence gets reported as a bug.
+Seven choices this API makes that a caller will meet sooner or later, and the
+reasoning behind each. They are written down because a decision nobody
+documented gets reported as a bug — and because knowing *why* a thing behaves
+as it does is what lets you build on it confidently rather than defensively.
 
 ## 1. A message sent while the agent is busy queues; it does not steer
 
