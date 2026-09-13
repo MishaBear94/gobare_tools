@@ -111,11 +111,28 @@ Access tokens expire in 7, 30 or 90 days, chosen when you mint one. There is no
 refresh — mint a new one and revoke the old. `GET /v1/health` reports a token's
 scopes, which is the cheapest way to check one is still good.
 
+## How long a workspace lives
+
+**A workspace is reclaimed 2 hours (7200 seconds) after it starts.** Long work is the
+product, so this is deliberately generous — but it is a ceiling, and a turn
+still running when it arrives ends as `failed`. Artifacts already published
+survive it; see [the artifacts section of the quickstart](quickstart.md).
+
+A workspace is also **paused after five minutes with nothing happening**, and
+woken by the next thing you send (5 minutes). Pausing is not an ending: the transcript
+lives in the control plane, so the agent comes back knowing what it knew. Time
+spent paused does not count against the 2 hours.
+
+If you have work that genuinely needs longer than 2 hours, break it into
+turns across sessions, or tell us — the number is a resource decision, not a
+law of nature.
+
 ## Not limited
 
-**Turn duration.** An agent may work for a long time; that is the product. Do
-not set an HTTP timeout on the *outcome* — send the message, get your `202`,
-and watch the turn through the event stream, a webhook, or polling.
+**How long you take to answer.** Nothing obliges you to poll, and a turn
+waiting on a `required_action` waits for you rather than timing out. Do not set
+an HTTP timeout on the *outcome* — send the message, get your `202`, and watch
+the turn through the event stream, a webhook, or polling.
 
 ## CORS
 

@@ -116,3 +116,15 @@ what it owed — and the same property means a retry can overtake nothing and a
 network can duplicate.
 
 Make your handler idempotent. The event names an object; read the object.
+
+## `turn.completed` waits for the artifacts
+
+The notification means "come and look", so it is sent once that turn's
+artifacts have finished publishing rather than the instant the turn settles.
+Without that wait, an integration doing the obvious thing — receive the call,
+fetch the artifacts — found an empty list, which is indistinguishable from a
+turn that produced nothing.
+
+If publication has not finished after 30 seconds the notification is sent
+regardless. Read `artifacts` on the turn to tell the two apart: `ready` means
+an empty list is final, `pending` means come back.

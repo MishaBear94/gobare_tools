@@ -360,6 +360,36 @@ And one thing a generated client would not: it **resumes**. A dropped
 connection continues from `Last-Event-ID` rather than starting over or losing
 the middle. See [events.md](events.md).
 
+## Collecting what a turn produced
+
+Anything the agent writes under `/workspace/outputs` is published as an
+artifact — a durable copy that outlives the workspace.
+
+Publishing happens **after** the turn settles, so that a storage problem can
+never delay or fail your work. That means `status: "completed"` is not yet a
+promise that `GET /v1/sessions/{id}/artifacts` will list anything. The turn
+tells you which it is:
+
+| `turn.artifacts` | |
+| --- | --- |
+| `null` | The turn has not settled, or predates this field |
+| `pending` | Settled; publication is still running. An empty list here means *not yet* |
+| `ready` | Publication finished. An empty list here means the turn produced nothing |
+| `failed` | Publication could not run. Quote the turn id when reporting it |
+
+```bash
+# Wait for the artifacts, not merely for the turn.
+until [ "$(curl -s "$GOBARE_API/v1/sessions/$SID/turns?limit=1" \
+  -H "Authorization: Bearer $GOBARE_TOKEN" | jq -r '.data[0].artifacts')" != "pending" ]; do sleep 1; done
+curl -s "$GOBARE_API/v1/sessions/$SID/artifacts" -H "Authorization: Bearer $GOBARE_TOKEN"
+```
+
+The `turn.completed` **webhook** already waits for you: it is sent once
+publication settles, so an unattended integration can fetch artifacts the
+moment it is called. If publication is still running after 30 seconds the
+notification is sent anyway, with the turn still reading `pending` — a late
+answer being better than none.
+
 ## Paging
 
 Every collection pages the same way, so learning it once is enough:
