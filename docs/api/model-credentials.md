@@ -1,7 +1,7 @@
 # Model credentials
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/model-credentials> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/model-credentials/> — read it there; this copy is for offline and for tooling.
 
 Gobare runs an agent against a model credential your organization owns. This is
 how you connect one without opening a browser.

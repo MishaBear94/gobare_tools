@@ -1,7 +1,7 @@
 # Turn documents into structured JSON
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/guides/extracting-structured-data> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/guides/extracting-structured-data/> — read it there; this copy is for offline and for tooling.
 
 You have a folder of invoices, contracts or reports, and you want rows in a
 database. This page goes from a PDF on your disk to validated JSON, in one

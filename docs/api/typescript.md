@@ -1,7 +1,7 @@
 # TypeScript client
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/typescript> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/typescript/> — read it there; this copy is for offline and for tooling.
 
 Everything on the other pages is a `curl`, because the API is the product and
 `curl` is the shortest way to see it work. This page is for after that: when you

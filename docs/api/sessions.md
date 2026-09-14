@@ -1,7 +1,7 @@
 # Sessions
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/sessions> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/sessions/> — read it there; this copy is for offline and for tooling.
 
 Everything `POST /v1/sessions` accepts, and what each field is for.
 
@@ -274,8 +274,34 @@ Send `null` or `""` to clear them.
 | --- | --- |
 | `auto` | Acts without asking. The default, and what an unattended integration wants |
 | `per_step` | Asks before each step. The approval arrives as a `required_action` of type `approval` |
-| `read_only` | May read and reason, may not write |
+| `read_only` | May read and reason, may not write. **Also refuses MCP tools the server has not annotated** — see below |
 | `plan` | Produces a plan without carrying it out |
+
+### `read_only` and MCP
+
+A tool this session cannot vouch for is a tool it will not run. MCP servers
+declare what a tool does with `readOnlyHint` in `tools/list`; `read_only`
+allows the ones that carry it and refuses the ones that do not, because "no
+annotation" is not the same as "harmless" — and an organization's private
+plugin has been reviewed by nobody.
+
+This bites the obvious shape: a read-only investigation with a read-only
+runbook server. If the server does not annotate, either have it do so, or say
+so yourself:
+
+```json
+{ "agent": { "approval_mode": "read_only",
+             "permission_rules": [{ "decision": "allow", "tool": "mcp_runbook_*" }] } }
+```
+
+A rule beats the mode, in both directions, which is what makes this expressible.
+
+**A refusal is visible.** It arrives as `approval.resolved` on the event stream
+with `approved: false`, the tool's `name`, a `code` of `denied_read_only` or
+`denied_by_rule`, and the same sentence the agent was given. Without that, an
+agent saying "I could not reach the runbook" is indistinguishable from a model
+that did not try — which is what it looked like before this event carried a
+name.
 
 `permission_rules` narrows further, and applies in every mode:
 

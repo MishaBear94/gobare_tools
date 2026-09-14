@@ -1,7 +1,7 @@
 # Guides
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/guides> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/guides/> — read it there; this copy is for offline and for tooling.
 
 Six things people build with the Agent API. Each one is a complete working
 program, not a sequence of fragments — copy it, run it, then change the parts

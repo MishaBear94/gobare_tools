@@ -1,7 +1,7 @@
 # Troubleshooting
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/troubleshooting> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/troubleshooting/> — read it there; this copy is for offline and for tooling.
 
 Indexed by what you are looking at, not by which part of the API it belongs to.
 

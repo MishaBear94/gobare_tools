@@ -1,7 +1,7 @@
 # Continue work across hours and rounds
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/guides/work-that-spans-hours> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/guides/work-that-spans-hours/> — read it there; this copy is for offline and for tooling.
 
 Some jobs are not one request. You ask for something, look at what came back,
 go to lunch, and ask for the next piece. In between, the workspace may have

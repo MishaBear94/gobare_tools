@@ -1,7 +1,7 @@
 # Limits
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/limits> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/limits/> — read it there; this copy is for offline and for tooling.
 
 Published so you can design against them rather than discover them.
 

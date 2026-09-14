@@ -1,7 +1,7 @@
 # Production integration
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/production-integration> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/production-integration/> — read it there; this copy is for offline and for tooling.
 
 The [quickstart](quickstart.md) gets one agent working. This page is the
 difference between that and something you can leave running: which token to

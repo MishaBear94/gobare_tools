@@ -1,7 +1,7 @@
 # Required actions
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/required-actions> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/required-actions/> — read it there; this copy is for offline and for tooling.
 
 How the agent calls *your* code. This is the one genuinely unusual thing in this
 API, and the one nobody guesses from the endpoint list.
@@ -108,8 +108,23 @@ things next:
 | --- | --- | --- |
 | `accepted` | Delivered; the turn is resuming | Nothing |
 | `already_resolved` | This call was answered before | Nothing. Usually a retry after a dropped connection, and it is not an error |
-| `not_delivered` | Recorded, but the sandbox did not take it | The turn will not resume from this. Expect it to fail or time out |
+| `not_delivered` | Recorded, but the sandbox did not take it | The turn will not resume from *this* answer. Nothing fails it — see below |
 | `unknown` | No such pending call | `404`. Check `turn_id` and `call_id`, or the turn has already moved on |
+
+**`not_delivered` does not end anything, and the row it names is closed.** The
+sandbox was not holding that call when your answer arrived — usually because it
+was restarted underneath the turn. Two sentences on this page used to disagree
+about what happens next: this table said "expect it to fail or time out", while
+[Deadlines](#deadlines) below says, correctly, that nothing times a required
+action out. The second one is true. The turn goes back to looking like ordinary
+work in progress, and the only thing that will eventually end it is the
+workspace's own two-hour ceiling.
+
+So `not_delivered` is the one outcome you have to handle rather than log. The
+session will read `working` with an empty `required_actions`, which is
+indistinguishable from healthy — on every surface, including webhooks and the
+event stream. Treat it as "this turn lost my answer": start a fresh turn with
+the same information, or fail the job and say why. Do not wait.
 
 `already_resolved` is the one worth designing for: at-least-once delivery on the
 notification side means you will sometimes answer twice, and answering twice is

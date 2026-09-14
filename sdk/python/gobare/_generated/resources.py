@@ -605,11 +605,11 @@ class ToolConfigText(TypedDict):
 
 
 class ToolRequest(TypedDict):
-    """One tool. `type` decides which of the two shapes below applies; the fields of the other are refused rather than ignored."""
+    """One tool. `type` decides which shape applies; the fields of another are refused rather than ignored. `function` and `mcp` need a `name`; the sandbox's own networked tools are named by their `type` alone and take no other field. Naming any of the latter narrows the session to exactly the ones listed — it cannot enable one this deployment has turned off, and an empty list is a session with no way out to the network."""
 
-    type: Literal["function", "mcp"]
-    name: str
-    """What the agent calls it. Copied back to you as `name`."""
+    type: Literal["function", "mcp", "web_search", "web_fetch", "image_search", "browse", "browser_act", "screenshot"]
+    name: NotRequired[str]
+    """`function` and `mcp` only, and required for both. What the agent calls it."""
     description: NotRequired[str]
     """`function` only. Read by the model to decide when to call it."""
     parameters: NotRequired[Dict[str, Any]]
@@ -650,7 +650,7 @@ class Turn(TypedDict):
     created_at: int
     """Unix milliseconds, when the input was accepted."""
     started_at: NotRequired[Union[int, None]]
-    """When the agent began. Null while queued."""
+    """When the agent began. Null until it does — a turn is `working` from the moment it is accepted, including while it waits behind another one, so this is the only field that tells the two apart. `queued` was removed from `status`; this description still named it."""
     completed_at: NotRequired[Union[int, None]]
     """When it settled. Null until it has."""
     artifacts: NotRequired[Literal["pending", "ready", "partial", "failed", null]]

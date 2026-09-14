@@ -1,7 +1,7 @@
 # Require human approval before the agent acts
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/guides/approvals-in-your-product> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/guides/approvals-in-your-product/> — read it there; this copy is for offline and for tooling.
 
 An agent that can restart a service or roll back a deployment should ask first,
 and the asking should happen where your team already is — your dashboard, your

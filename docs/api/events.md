@@ -1,7 +1,7 @@
 # Events
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/events> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/events/> — read it there; this copy is for offline and for tooling.
 
 Server-sent events, resumable. Two streams:
 
@@ -118,7 +118,7 @@ a promise we could not withdraw.
 | `message.dequeued` | yes | A queued message started |
 | `file.changed` | yes | A workspace file was created, modified or deleted |
 | `approval.requested` | yes | The agent wants permission |
-| `approval.resolved` | yes | Permission was granted or refused |
+| `approval.resolved` | yes | Permission was granted or refused. A refusal carries `name`, a `code` (`denied_read_only`, `denied_by_rule`, `approval_timeout`) and the reason the agent was given — so a tool the platform blocked is tellable from one the model never tried |
 | `question.asked` | yes | The agent asked a person something |
 | `question.answered` | yes | It was answered |
 | `tool.required` | yes | Your code must answer — see [required-actions.md](required-actions.md) |

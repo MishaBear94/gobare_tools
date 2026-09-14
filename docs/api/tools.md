@@ -1,22 +1,64 @@
 # Tools
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/tools> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/tools/> — read it there; this copy is for offline and for tooling.
 
-Two kinds, and they differ in where the code runs.
+Three kinds, and they differ in where the code runs.
 
 | | Runs where | Use it for |
 | --- | --- | --- |
 | **function** | **Your process.** The agent asks; you answer. | Anything only your system knows — an order's status, a customer record, a price |
 | **mcp** | **A server the sandbox connects to.** | An MCP server you host, or a hosted one from a vendor |
+| **built-in** | **The sandbox.** Already there; you choose which. | Reaching the internet: search, fetch, a real browser |
 
-Both are set with one call, which **replaces** the whole configuration:
+Everything else the agent can do — shell, reading and writing files, starting
+services, publishing a preview, committing to a repository — is always present
+and is not configured here. You are choosing what it can reach *outside* the
+workspace, not what it can do inside one.
+
+All three are set with one call, which **replaces** the whole configuration:
 
 ```
 PUT /v1/sessions/{session_id}/tools
 ```
 
 At most **32** tools per session; each name is **1–64** characters.
+
+---
+
+## Built-in tools
+
+The sandbox already has these. Naming one is the whole request — they take no
+other field:
+
+```bash
+curl -s -X PUT $GOBARE_API/v1/sessions/$SESSION/tools \
+  -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' \
+  -d '{"tools":[{"type":"web_search"},{"type":"web_fetch"}]}'
+```
+
+| | |
+| --- | --- |
+| `web_search` | Search the web. Returns titles, URLs and snippets |
+| `web_fetch` | Read one page |
+| `image_search` | Search for images |
+| `browse` | Open a page in a real browser and read what rendered |
+| `browser_act` | Click, type, navigate in that browser |
+| `screenshot` | Capture what the browser is showing |
+
+**Naming any of them narrows the session to exactly those.** Say nothing and the
+session gets whatever this deployment allows, which is what every session got
+before you could choose. Say `"tools": []` and it gets **none of them** — no way
+out to the network at all, which is the shape for running code you have not
+read.
+
+**You can only narrow.** A tool the deployment has turned off does not come back
+by being named in a request body. If it did, the operator switch would be
+decoration, and the one thing it exists for — running untrusted work with no
+route to the internet — is exactly what it could no longer guarantee.
+
+So the list you get is the intersection, and reading the configuration back
+tells you what you actually have rather than what you asked for.
 
 ---
 

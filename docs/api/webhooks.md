@@ -1,7 +1,7 @@
 # Webhooks
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/webhooks> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/webhooks/> — read it there; this copy is for offline and for tooling.
 
 Be told what happened instead of watching for it. Delivery is **at least once**,
 which is the only promise worth making over a network we do not control.

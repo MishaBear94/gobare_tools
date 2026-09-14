@@ -1,7 +1,7 @@
 # Changelog
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/changelog> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/changelog/> — read it there; this copy is for offline and for tooling.
 
 What changed in `/v1`, newest first. Additions only unless a line says
 otherwise — a field appearing is not a breaking change, and nothing here has
@@ -10,6 +10,37 @@ removed one.
 Dates are when the change reached production.
 
 ## 2026-09-14
+
+**A backend we cannot reach is `503`, not `401`.** A lookup that failed — a
+restarting directory, a network blip — was swallowed into "no such token" and
+answered `401 This access token is not recognized`, the same code and the same
+sentence a deleted token gets. That is the expensive direction to be wrong in:
+`401` tells a well-behaved integration to stop, alarm and audit its
+credentials, over a condition that clears in seconds. It is now
+`503 directory_unavailable` with `Retry-After`, and the message says the
+problem is not yours. A token that genuinely does not exist is still `401`.
+
+**`read_only` allows MCP tools the server declares read-only.** It refused all
+of them, on the stated grounds that MCP does not describe a tool's side
+effects. The protocol does — `readOnlyHint` in `tools/list` — and we were
+dropping the annotation while mapping. Unannotated tools are still refused.
+See [sessions.md](sessions.md).
+
+**A blocked tool call says what it blocked.** `approval.resolved` carried a
+`toolCallId` and a code, with no tool name and no preceding
+`approval.requested` to match it to — so an agent saying "I could not reach
+the runbook" was indistinguishable from a model that never tried. It now
+carries `name`, and the reason the agent was given.
+
+
+**A session can choose which networked tools it gets.** `tools` now accepts
+`web_search`, `web_fetch`, `image_search`, `browse`, `browser_act` and
+`screenshot` by type — the sandbox tools that reach outside the workspace.
+Naming any of them narrows the session to exactly those; `[]` means none, which
+is the shape for running code you have not read. You can only narrow: a tool
+this deployment has turned off does not come back by being named. Saying
+nothing keeps what every session had before. See [tools.md](tools.md).
+
 
 **The four endpoints that do not answer with JSON now say so in
 `GET /v1/openapi.json`.** Both event streams were published as

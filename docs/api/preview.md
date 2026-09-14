@@ -1,13 +1,14 @@
 # Preview
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/preview> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/preview/> — read it there; this copy is for offline and for tooling.
 
-The agent starts a server in its workspace. You publish it, and someone who has
-never heard of Gobare opens a URL and sees it.
+**Put what the agent built on a public URL, and share it.** The agent starts a
+server in its workspace; you publish it; someone who has never heard of Gobare
+opens the link in a browser and sees the thing.
 
-This is the part that makes a session more than a job runner: the agent builds a
-thing, and the thing is reachable. Preview and publish are two different
+This is the part that makes a session more than a job runner: the agent builds
+something, and the something is reachable. Preview and publish are two different
 addresses, and the difference is who can open them.
 
 | | Who reaches it | Lives for |

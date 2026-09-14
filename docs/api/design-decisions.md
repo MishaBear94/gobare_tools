@@ -1,7 +1,7 @@
 # Design decisions
 
 > Published from the Gobare product repository. The canonical page is
-> <https://docs.gobare.dev/design-decisions> — read it there; this copy is for offline and for tooling.
+> <https://docs.gobare.dev/design-decisions/> — read it there; this copy is for offline and for tooling.
 
 Seven choices this API makes that a caller will meet sooner or later, and the
 reasoning behind each. They are written down because a decision nobody
