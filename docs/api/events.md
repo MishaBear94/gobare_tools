@@ -25,11 +25,39 @@ data: {"object":"event","type":"agent.message","internal_type":"agent.message",
 `internal_type` travels alongside `type` so that when you ask us about
 something, you and our logs are naming the same thing.
 
+## If you stop reading
+
+A stream you hold open but do not read backs up. Past about a megabyte of
+unread frames the transient ones are dropped — deltas and progress, the
+decoration this page tells you to treat as decoration — and the persisted ones
+keep coming, so nothing a cursor resumes from is lost. Past eight megabytes the
+connection is closed.
+
+Reconnect with your last `seq` and you get everything back. That is what the
+cursor is for, and it is why closing is safe.
+
+## Reconnecting
+
+The stream sends its own `retry:` hint and you should honour it. It is
+deliberately longer than the time it takes us to notice a connection has gone:
+a slot is not freed the instant your client walks away, and reconnecting inside
+that window at your ceiling would be refused for a stream you had already
+closed.
+
+That refusal, if you meet it, is `rate_limit_exceeded` with `Retry-After`. It is
+not a request to close anything.
+
 ## Resuming
 
 **An `id:` line is written only for a persisted event.** Reconnect with
 `Last-Event-ID: <seq>` (or `?last_event_id=<seq>`) and you get everything
 persisted after that point, then live frames.
+
+Sending no cursor at all is different from sending `0`. **No cursor is live
+frames only** — which is what "subscribe first, then send" needs. **`0` is
+everything**, because zero is a real cursor: it is the one your code starts
+with, and a first connection that asks for everything after nothing should get
+everything.
 
 ```bash
 curl -N "$GOBARE_API/v1/sessions/$SESSION/events?last_event_id=4812" \
@@ -44,6 +72,25 @@ token-by-token stream and is transient, while `agent.message` is its settled
 form and is persisted. **Build on the persisted events; treat the transient ones
 as decoration.** A cursor always names a row that exists, which is what makes
 resuming safe rather than approximate.
+
+### When there is more to replay than one connection will carry
+
+A replay is walked to the end, however many pages that takes. Past 50,000
+events in a single reconnect the stream stops replaying and says so, in a frame
+of its own, before live frames begin:
+
+```
+event: gobare.replay_truncated
+data: {"object":"event","type":"gobare.replay_truncated","seq":null,
+       "from_seq":91204,
+       "note":"More than 50000 events were waiting. Live frames follow from here; reconnect with last_event_id=91204 to collect the rest first."}
+```
+
+Reconnect with that `from_seq` and you get the next stretch. You will not see
+this frame in ordinary use — it takes an integration that has been away for a
+very long time — and it exists so that being away that long is something you
+are **told about** rather than a gap in your records you would have no way to
+notice.
 
 ## The vocabulary
 
@@ -72,6 +119,8 @@ a promise we could not withdraw.
 | `question.asked` | yes | The agent asked a person something |
 | `question.answered` | yes | It was answered |
 | `tool.required` | yes | Your code must answer — see [required-actions.md](required-actions.md) |
+| `mcp.unavailable` | yes | A server you declared would not connect and was skipped — see below |
+| `gobare.replay_truncated` | no | There was more history than one connection carries. Reconnect from `from_seq` — see "Resuming" |
 | `tool.resolved` | yes | It was answered |
 | `sandbox.created` / `sandbox.paused` / `sandbox.resumed` | yes | Workspace lifecycle |
 | `preview.ready` | yes | A service the agent started is reachable |
@@ -104,3 +153,8 @@ An MCP server you declared would not connect and was skipped. Carries `server`
 and `reason`. Not an error: the turn continues without that server's tools,
 which is what `required: false` asks for. See [tools.md](tools.md) if you would
 rather it failed.
+
+## Next
+
+- [webhooks](webhooks.md) — be told instead of watching
+- [troubleshooting](troubleshooting.md) — the stream went quiet

@@ -1,21 +1,23 @@
 # Guides
 
-Six things people build with the Agent API, each written as a working
-sequence you can copy.
+Six things people build with the Agent API. Each one is a complete working
+program, not a sequence of fragments — copy it, run it, then change the parts
+that are about your business rather than ours.
 
 The [quickstart](../quickstart.md) gets you from a token to a completed turn.
-These go further: each one is a whole scenario, and each leans on a different
-part of the platform, so reading two of them is not reading the same thing
-twice.
+These go further, and each leans on a different part of the platform, so
+reading two of them is not reading the same thing twice.
 
-| Guide | Build this when |
+| I want to… | Guide |
 | --- | --- |
-| [Work that spans hours](work-that-spans-hours.md) | The job takes several rounds and you do not want to repeat yourself |
-| [Extracting structured data](extracting-structured-data.md) | You need JSON back, over a batch of inputs, without duplicate work |
-| [Approvals in your own product](approvals-in-your-product.md) | A person has to say yes before the agent does something |
-| [An agent behind your API](an-agent-behind-your-api.md) | Your service dispatches work and never waits for it |
-| [Showing the agent's work](showing-the-agents-work.md) | Your users watch it happen, not a spinner |
-| [Switching model providers](switching-model-providers.md) | You want to change model or vendor without changing code |
+| Turn a pile of PDFs, contracts or reports into rows in my database | [Turn documents into structured JSON](extracting-structured-data.md) |
+| Hand work to an agent from my own API and collect it later | [Put an agent behind your own API](an-agent-behind-your-api.md) |
+| Make a person approve something before the agent does it | [Require human approval before the agent acts](approvals-in-your-product.md) |
+| Show my users what the agent is doing, live | [Stream the agent's progress into your UI](showing-the-agents-work.md) |
+| Keep one job going across hours, pausing in between | [Continue work across hours and rounds](work-that-spans-hours.md) |
+| Change model or vendor without touching my code | [Swap model providers without changing your code](switching-model-providers.md) |
+
+Every script here is standard library only. No SDK to install, in any language.
 
 ## Before any of them
 
@@ -24,32 +26,65 @@ export GOBARE_API=https://api.gobare.dev
 export GOBARE_TOKEN=gbr_pat_…
 ```
 
-Mint the token in the Console under **Build with API › API keys**, and choose
-the **Agent API** type. The default CLI type only imports projects; every `/v1`
-route refuses it.
+Mint the token in the Console under **Settings › Developer access**, choosing
+**Agent API · read/write**. The default **CLI import** type holds only the `cli`
+scope and is refused by every `/v1` route.
 
-Connect a model under **Settings › LLM models**. Gobare is bring-your-own-key:
-the model bill is yours, the computer is ours.
+Then connect a model — `POST /v1/model-credentials`, or the Console under
+**Settings › LLM models**. Gobare is bring-your-own-key: the model bill is
+yours, the computer is ours.
 
-## Two things that will save you an afternoon
+One call proves all three:
+
+```bash
+curl -s $GOBARE_API/v1/model-credentials -H "Authorization: Bearer $GOBARE_TOKEN"
+```
+
+A list back means your token is valid, scoped, and has a model to run. The
+`model` in it is what goes in `agent.model`.
+
+## Four things that will save you an afternoon
+
+These are not trivia. Each one is a mistake that costs hours because it
+produces *plausible* behaviour rather than an error.
 
 **Wait for artifacts, not for the turn.** Files the agent writes under
 `/workspace/outputs` are published *after* the turn settles, so for a moment
-after `status: "completed"` the artifact list is legitimately empty. Wait for
-the turn's `artifacts` field to leave `pending`:
-
-```bash
-until [ "$(curl -s "$GOBARE_API/v1/sessions/$SID/turns?limit=1" \
-  -H "Authorization: Bearer $GOBARE_TOKEN" | jq -r '.data[0].artifacts')" != "pending" ]; do sleep 1; done
-```
-
-If you use webhooks you can ignore this: `turn.completed` is sent once
-publishing has finished.
+after `status: "completed"` the artifact list is legitimately empty — and
+indistinguishable from a turn that produced nothing. Poll the turn's
+`artifacts` field until it leaves `pending`. With [webhooks](../webhooks.md)
+you can ignore this: `turn.completed` is sent once publishing has finished.
 
 **Subscribe before you send.** Open the event stream first, then post the
-message. The other order loses the opening events whenever the agent starts
+message. The other order loses the opening frames whenever the agent starts
 quickly — which is to say intermittently, and never on your machine.
 
-[`run-session.ts`](../run-session.ts) handles both, along with answering the
-agent's calls into your code. It is the same file our own end-to-end tests run
-against, so it cannot quietly stop working.
+**Tell the agent not to ask questions**, if nothing in your product can answer
+one. An agent that meets ambiguity parks on a `question`, which **the API
+cannot answer** — only a person in the Console can. One line in `instructions`
+prevents it:
+
+```
+Never ask the user a clarifying question: if something is ambiguous,
+state your assumption and continue.
+```
+
+**Two `429`s mean opposite things.** `rate_limit_exceeded` is worth retrying;
+`project_limit_exceeded` means the organization is at its session ceiling and
+retrying never clears it. Branch on `error.code`, never on the status alone.
+
+## The reference
+
+The guides show a shape; the reference pages have every field.
+
+- [sessions.md](../sessions.md) — repositories, files, secrets, permissions
+- [input.md](../input.md) — the four things you can send a session
+- [events.md](../events.md) — the event vocabulary
+- [errors.md](../errors.md) — every refusal, in one shape
+- [limits.md](../limits.md) — every ceiling, with its number
+- [troubleshooting.md](../troubleshooting.md) — arriving with a symptom instead of a question
+
+[`run-session.ts`](../run-session.ts) is a TypeScript client that handles the
+first two afternoon-savers above, plus answering the agent's calls into your
+code. It is the same file our own end-to-end tests run against, so it cannot
+quietly stop working.

@@ -21,7 +21,7 @@ curl -s -X POST $GOBARE_API/v1/webhooks \
 verifiable. `GET /v1/webhooks` lists subscriptions without it, and
 `DELETE /v1/webhooks/{webhook_id}` removes one.
 
-## Events you may subscribe to
+## Event types
 
 | Event | When |
 | --- | --- |
@@ -57,7 +57,7 @@ you a second schema to keep compatible forever.
 Two headers:
 
 ```
-x-gobare-timestamp: 1789172121
+x-gobare-timestamp: 1789305457283
 x-gobare-signature: 7f3a…
 ```
 
@@ -79,12 +79,67 @@ export function verify(secret: string, timestamp: number, body: string, presente
 }
 ```
 
+In Python, the same three rules — `compare_digest` is the timing-safe compare:
+
+```python
+import hashlib, hmac
+
+def verify(secret: str, timestamp: str, body: bytes, presented: str) -> bool:
+    expected = hmac.new(secret.encode(),
+                        timestamp.encode() + b"." + body,
+                        hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, presented)
+```
+
 Verify against the **raw** body, before any JSON parse and re-serialise — a
 round trip changes key order and whitespace and will not match.
 
-Then reject a timestamp far from your own clock. A few minutes is a reasonable
-window; we do not pick one for you because your tolerance for clock skew is
-yours to decide.
+Getting the raw body is the part frameworks make hard, and each one has its own
+way:
+
+| | |
+| --- | --- |
+| Express | `express.raw({type: "application/json"})` on this route — `express.json()` has already discarded the bytes |
+| FastAPI | `await request.body()`, not the parsed model |
+| Flask | `request.get_data()`, not `request.json` |
+| Next.js | Read the stream; the App Router gives you `await req.text()` |
+
+A verifier that re-serialises the parsed object passes every test you write
+against your own serialiser and fails against ours.
+
+**The timestamp is milliseconds**, the same units as `Date.now()`. It is signed
+as the exact digits sent, so verify with the string you received rather than a
+number you converted and converted back.
+
+Then reject a timestamp far from your own clock:
+
+```ts
+if (Math.abs(Date.now() - Number(timestamp)) > 5 * 60_000) return false;
+```
+
+A few minutes is a reasonable window; we do not pick one for you because your
+tolerance for clock skew is yours to decide. Dividing by 1000 first — which is
+what a seconds-shaped example invites — rejects every delivery, and it fails
+looking exactly like a bad signature.
+
+## One subscription per address and event set
+
+Subscribing the same URL to exactly the same events twice is refused with
+`409 conflict`, naming the subscription already doing it:
+
+```json
+{ "error": { "code": "conflict",
+  "message": "This organization already subscribes https://you.example.com/hooks to exactly these events, as whsub_… Delete it first if you want a new secret, or subscribe a different address — a second identical subscription would deliver everything twice." } }
+```
+
+A duplicate is easy to create by accident — retrying a create that appeared to
+fail is enough — and what it buys you is every delivery twice, permanently,
+with nothing anywhere saying so. Deliveries are already at-least-once; doubling
+them is a different problem.
+
+The same address subscribed to a *different* set of events is a different
+subscription and is allowed: one endpoint for completions and another for the
+ones that need a person is a reasonable shape.
 
 ## Retries
 
@@ -108,7 +163,7 @@ dead with the reason recorded.
 A receiver that hangs is abandoned after 10 seconds and retried. Answer
 quickly and do the work afterwards.
 
-## What at-least-once means for you
+## At-least-once delivery
 
 **Deliveries can arrive more than once, and can arrive out of order.** The queue
 is rows in a database rather than timers in memory, so a restart still owes
@@ -127,4 +182,15 @@ turn that produced nothing.
 
 If publication has not finished after 30 seconds the notification is sent
 regardless. Read `artifacts` on the turn to tell the two apart: `ready` means
-an empty list is final, `pending` means come back.
+an empty list is final, `pending` means come back, and `partial` means some
+files were left behind — `artifacts_skipped` on the turn says which and why.
+
+A delivery that never arrives is usually a subscription that was never created,
+a URL that is not https, or an event name that is not one of the above — see
+[troubleshooting.md](troubleshooting.md) for symptoms and
+[errors.md](errors.md) for the refusal shape.
+
+## Next
+
+- [events](events.md) — watch a single session live instead
+- [idempotency](idempotency.md) — deliveries arrive at least once

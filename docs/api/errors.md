@@ -15,6 +15,12 @@ written for people and may be reworded.
 `request_id` is also on the `x-request-id` header. Quote it when you ask us
 about a call — it is how we find that exact request in our logs.
 
+**Every `/v1` response carries `x-request-id`, not only the failures** — a 200,
+a 202, an SSE stream. The calls worth asking about are often the ones that
+succeeded and did something surprising, and those need a handle too. Log the
+header next to whatever your integration records about the call; it costs
+nothing until the day it is the only thing that helps.
+
 ## The codes
 
 | Code | Status | Retry | Meaning |
@@ -24,6 +30,7 @@ about a call — it is how we find that exact request in our logs.
 | `authentication_error` | 401 | no | No token, or one we do not recognise. A revoked or expired token lands here |
 | `permission_denied` | 403 | no | The token is valid and lacks the scope, which the message names |
 | `not_found` | 404 | no | No such session, turn, artifact, template — or no such endpoint |
+| `method_not_allowed` | 405 | no | The path exists; this verb does not. The `Allow` header lists the ones that do |
 | `conflict` | 409 | maybe | The session is not in a state that allows this. `input.steer` with no turn running is the common one |
 | `queue_full` | 429 | after a wait | This session already holds the maximum queued messages |
 | `rate_limit_exceeded` | 429 | after `Retry-After` | Too many requests, or too many open streams |
@@ -71,7 +78,7 @@ matters more than the status:
 
 A client that retries all 429s identically will spin forever on the third.
 
-## Internal errors never leak
+## Internal errors
 
 An unexpected failure is reported as `internal_error` with a fixed message.
 Internal errors routinely carry file paths, SQL and provider responses, and none
@@ -80,7 +87,7 @@ findable by the `request_id` you were handed.
 
 If you see one, it is worth reporting.
 
-## Errors that are not this shape
+## Errors from outside the API
 
 `/v1` always answers JSON in this envelope, including `404` for an unknown path
 — so a JSON parse failure means you did not reach `/v1` at all. Check the host
@@ -88,3 +95,9 @@ and the `/v1` prefix.
 
 A `413` from an intermediate proxy is likewise not us; our own body ceiling
 answers `invalid_request` with `400`.
+
+## Next
+
+- [input](input.md) — what each input event accepts, and when each refusal happens
+- [troubleshooting](troubleshooting.md) — a symptom rather than a code
+- [limits](limits.md) — the ceilings behind the 429s

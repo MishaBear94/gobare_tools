@@ -23,6 +23,32 @@ request is not charged — but it does not shorten it either.
 
 The buckets are separate: exhausting session creation does not stop you reading.
 
+### What you have left, before you run out
+
+Every authenticated `/v1` response carries your current budget, so you can pace
+rather than discover the wall:
+
+```
+x-ratelimit-limit: 120
+x-ratelimit-remaining: 117
+x-ratelimit-reset: 2
+x-ratelimit-resource: general
+```
+
+| Header | |
+| --- | --- |
+| `x-ratelimit-limit` | The ceiling for this bucket |
+| `x-ratelimit-remaining` | Whole requests you can make right now. Never rounded up — a request that would be refused is not one you have |
+| `x-ratelimit-reset` | Whole seconds until this bucket is full again. `0` means it already is |
+| `x-ratelimit-resource` | `general` or `sessions` — **which** bucket these numbers describe |
+
+`resource` matters more than it looks. The same token legitimately holds 9 of
+one bucket and 119 of the other at the same instant; without a name for which
+is which, one of those numbers reads as a bug.
+
+The 429 carries them too, alongside `Retry-After`, so a caller that has been
+refused can see the whole shape in one response rather than inferring it.
+
 ## Request body
 
 **1 MiB.** Every field this API accepts is text — a prompt, a title, a tool
@@ -52,6 +78,12 @@ Each ceiling applies to the *decoded* bytes, not the base64 string. Over any of
 them the request is refused with `invalid_request` — nothing is truncated, and
 no session is left behind for you to clean up.
 
+A file that could not be written is reported: the session still opens, and an
+`error` item says which file and why, because a seeded file is part of how the
+session was defined and one going missing quietly is worse than the session
+failing. Before that it went to our logs alone, and the transcript's "wrote N
+files" counted only the ones that landed — which reads as success.
+
 Seeded files are written into the workspace when it comes up, **if they are not
 already there**. A sandbox that was paused and woken keeps the agent's edits; a
 sandbox that had to be rebuilt gets the files again, because they are part of
@@ -65,17 +97,34 @@ how the session was defined. They are deleted with the session.
 | Open streams per organization | 20 |
 
 Past either you get `rate_limit_exceeded` **before** the stream opens, so you
-receive a readable JSON error rather than a connection that dies.
+receive a readable JSON error rather than a connection that dies. It carries
+`Retry-After`, because it is often temporary — see below.
 
 Both ceilings exist: the per-token one alone is no bound at all, because an
 organization can mint tokens.
 
+A stream you hold open but do not read backs up: past ~1 MiB of unread frames
+the transient ones are dropped, past 8 MiB the connection is closed. Reconnect
+with your cursor and nothing persisted is lost — see [events.md](events.md).
+
 Close streams you are not reading. A slot is freed when the connection ends, by
-any means.
+any means — but **not instantly**. Behind a proxy we learn a connection is gone
+when the proxy tells us, which takes a few seconds. A caller at its ceiling
+that loses a stream and immediately opens a replacement can therefore be
+refused for a stream it has already closed.
+
+The thing that makes it survivable is that **the stream's own `retry:` hint is
+longer than the window**, so a client following our instruction is not racing
+us. Measured against production: a slot behind the proxy is released about four
+and a half seconds after the client goes away, and the hint is eight.
+
+If you do get the refusal anyway — because you reconnect on your own schedule
+rather than ours — it carries `Retry-After`. Honour it and reconnect. It is not
+a request to close anything.
 
 ## Concurrent sessions
 
-**5 per organization by default.** A session is a cloud computer, so this is a
+**25 per organization by default.** A session is a cloud computer, so this is a
 spend ceiling as much as a product tier.
 
 "Concurrent" is literal: there is no archive state, so a session holds a slot
@@ -105,6 +154,18 @@ cleans up.
 Files past either ceiling are skipped; the turn still succeeds, because a turn
 that produced good work and a storage problem has still produced good work.
 
+**And it tells you.** A turn that left something behind reports
+`artifacts: "partial"` rather than `"ready"`, and carries `artifacts_skipped`
+naming each file and why:
+
+```json
+{"artifacts":"partial",
+ "artifacts_skipped":[{"path":"outputs/build.tar","reason":"larger than 209715200 bytes"}]}
+```
+
+Before that existed the turn said `ready`, the file was simply not in the list,
+and the obvious conclusion — that the agent never wrote it — was the wrong one.
+
 ## Metadata
 
 | | Limit |
@@ -124,6 +185,13 @@ of `tool`, `path`, `command`, `domain` (500 characters each). A rule this API
 cannot read is refused, so an integration never runs on fewer rules than it
 sent.
 
+## Model connections
+
+**25 per organization**, the same ceiling as environment templates. Past it,
+`POST /v1/model-credentials` is refused and names the endpoint that frees one.
+Re-connecting a key you already connected is not a new connection and does not
+count against it.
+
 ## Environment templates
 
 **25 per organization.** Posting a name that already exists replaces it rather
@@ -135,7 +203,7 @@ Access tokens expire in 7, 30 or 90 days, chosen when you mint one. There is no
 refresh — mint a new one and revoke the old. `GET /v1/health` reports a token's
 scopes, which is the cheapest way to check one is still good.
 
-## How long a workspace lives
+## Workspace lifetime
 
 **A workspace is reclaimed 2 hours (7200 seconds) after it starts.** Long work is the
 product, so this is deliberately generous — but it is a ceiling, and a turn
@@ -163,3 +231,8 @@ the turn through the event stream, a webhook, or polling.
 There is none, deliberately. `/v1` is server-to-server only, because a
 `gbr_pat_` token in browser JavaScript is a leaked credential. Call it from your
 backend.
+
+## Next
+
+- [idempotency](idempotency.md) — retrying safely
+- [troubleshooting](troubleshooting.md) — you hit one and are not sure why

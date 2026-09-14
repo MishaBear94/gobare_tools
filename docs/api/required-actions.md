@@ -3,7 +3,7 @@
 How the agent calls *your* code. This is the one genuinely unusual thing in this
 API, and the one nobody guesses from the endpoint list.
 
-The shape: the agent stops mid-turn, the turn goes to `waiting`, and the session
+The shape: the agent stops mid-turn, the session goes to `requires_action`, and the session
 reports what it needs. You do the work wherever your code runs, send the result
 back, and the turn resumes from where it paused.
 
@@ -27,13 +27,13 @@ The same call takes `mcp` servers and `skill` entries; `PUT` replaces the whole
 configuration rather than merging, so send the complete list every time. You can
 also pass `agent.tools` when creating the session.
 
-## Noticing that you are needed
+## Noticing
 
 Three ways, in increasing order of how much you have to do:
 
 1. **Webhook** — subscribe to `session.action_required`.
 2. **Event stream** — watch for `tool.required`.
-3. **Polling** — a turn whose `status` is `waiting`, or a session whose
+3. **Polling** — a session whose
    `required_actions` is non-empty.
 
 ```bash
@@ -55,12 +55,13 @@ Three types appear here:
 
 | `type` | Answered by |
 | --- | --- |
-| `function_call` | Your code, through this API |
-| `approval` | A person, in the Console |
-| `question` | A person, in the Console |
+| `function_call` | Your code — `input.tool_result` |
+| `approval` | Your code — `input.approval` — or a person in the Console |
+| `question` | Your code — `input.question_answer` — or a person in the Console |
 
-`approval` and `question` are listed so an integration can *see* that a human is
-holding up a session it cares about. Answering them is a Console action.
+All three are answerable through this API. `approval` and `question` can also be
+answered by a person in the Console, which is often what you want — the point is
+that an API-only integration is no longer stuck waiting for one.
 
 ## Answering
 
@@ -77,7 +78,10 @@ curl -s -X POST $GOBARE_API/v1/sessions/$SESSION/events \
       }]}'
 ```
 
-Needs the `tools:respond` scope.
+Needs the `tools:respond` scope — and only that one. A token holding
+`sessions:read` and `tools:respond` can watch this session and answer its
+function calls while being unable to send it a message, cancel its turn or
+delete it, which is what you want a fleet of tool handlers to hold.
 
 `turn_id` and `call_id` are copied from the required action. **`output` must be
 a string** — serialise it yourself. We cannot know whether your object was meant
@@ -108,18 +112,79 @@ things next:
 notification side means you will sometimes answer twice, and answering twice is
 legitimate rather than a bug to guard against.
 
-## A deadline
+## Deadlines
 
-A required action does not wait forever. If nothing answers, the turn ends
-rather than holding a sandbox open indefinitely — a session waiting on a caller
-that crashed is still costing compute.
+**By default there is no deadline.** Nothing times a required action out. The
+turn waits for you, the workspace is not paused underneath it, and the session
+stays `requires_action` until you answer.
 
-Answer promptly, and treat a turn found in `failed` with an unanswered action as
-a thing to retry from the start rather than a state to resume.
+That is the right default and the wrong one to leave alone in production: a
+process that dies mid-answer holds a workspace until its age cap with nothing
+anywhere saying so. So you can declare your own, per tool:
 
-## Why not just a webhook round trip
+```json
+{ "type": "function", "name": "lookup_order", "timeout_seconds": 30,
+  "parameters": { "type": "object", "properties": { "order_id": { "type": "string" } } } }
+```
+
+Per tool rather than per session, because the answer is a property of the
+function. A billing lookup that has not replied in thirty seconds is not going
+to; an approval may legitimately take until morning. One number for the whole
+session would force the slowest tool's patience on every other one.
+
+**Past the deadline the call fails and the turn carries on.** It does not fail
+the turn. The agent has usually done real work before it reached your tool, and
+throwing that away because your process died is a worse outcome than the one
+the deadline exists to prevent — so a timed-out function is an ordinary
+failure, the agent is told not to retry it, and it continues or reports that it
+could not. This is also what makes the number safe to guess: too short costs
+you one failed call, not a lost turn.
+
+Each pending action reports its own `expires_at` in Unix milliseconds, or null
+when it has none. Accepted range is 1 to 7200 seconds — the ceiling is the
+workspace's own lifetime, because a deadline past the point where the session
+is reclaimed could never arrive.
+
+Approvals and questions never expire. Those are waiting on a person in the
+Console, and timing one out would be us deciding somebody took too long to
+think.
+
+Whether or not you set one, the workspace's own ceiling still applies and
+belongs to the session rather than to the action: **a workspace is reclaimed two
+hours after it starts**, and a turn still parked when that arrives ends as
+`failed`. That number lives in [limits.md](limits.md) and nowhere else.
+
+So: for a decision that might take minutes, answer whenever you are ready. For
+one that might take overnight — a person approving a production change, say —
+do not hold the turn. Answer the tool with "queued for review" and start a fresh
+round when the decision arrives; see
+[Approvals in your own product](guides/approvals-in-your-product.md).
+
+## When it goes wrong
+
+| What you see | Why | Fix |
+| --- | --- | --- |
+| Your poller waits forever on a `working` session | It is parked on a `question` or an `approval`, which **only a person in the Console can answer** | Branch on `required_actions[].type`. If nothing in your product can answer one, instruct the agent never to ask |
+| `400` — "not a function call, so it cannot be answered with input.tool_result" | You answered a `question` or `approval` through the API | The action stays open; a person resolves it. This used to be accepted, close the action, and strand the session |
+| `404 No pending action` | `turn_id` or `call_id` is not from this session, or the call already expired | Copy both from `required_actions` verbatim |
+| `outcome: "not_delivered"` | The call timed out while you were computing the answer | Raise that tool's `timeout_seconds` to what your service really needs |
+| `outcome: "already_resolved"` | You answered twice | Nothing. A retry after a dropped connection is legitimate |
+| `403 permission_denied` | The token lacks `tools:respond` | Mint one with that scope |
+| The agent invents an answer instead of calling your function | Nothing told it the function is the only source of truth | Say so in `instructions`, and describe the tool in terms of what it knows |
+
+More symptoms, across the whole API, in
+[troubleshooting.md](troubleshooting.md); the shape every refusal arrives in is
+[errors.md](errors.md).
+
+## Compared with webhooks
 
 Because the turn is a single agent run, not a sequence of requests. The agent
 paused mid-reasoning with its context intact; when your result arrives it
 continues from exactly there. A design that ended the turn and started another
 would lose that, and would make every function call a fresh conversation.
+
+## Next
+
+- [input](input.md) — the four things you can send, `input.tool_result` among them
+- [tools](tools.md) — declare the functions the agent may call
+- [approvals in your product](guides/approvals-in-your-product.md) — put a person in the loop

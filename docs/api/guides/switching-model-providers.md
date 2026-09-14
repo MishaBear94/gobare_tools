@@ -1,18 +1,28 @@
-# Switching model providers
+# Swap model providers without changing your code
 
 The same agent and the same task, running on a different model tomorrow than it
-did today. Because of price, because one model is better at your particular
-work, because a vendor had an outage, or because someone decided the data
-should not leave a region.
+did today — because of price, because one model is better at your work, because
+a vendor had an outage, or because someone decided the data must not leave a
+region.
 
-You change one field.
+You change one field. Here are two runs of an identical task, on two
+connections that speak **different wire protocols**:
 
-## What this relies on
+```
+ minimax  yu7u7hurzewanyl  session=b47783ab  artifacts=1
+  custom  ybycd8m28v0o2yd  session=d74ab74e  artifacts=1
+```
 
-Gobare is bring-your-own-key. The model bill is yours; the computer is ours.
-Nine connectors are built in — Anthropic, OpenAI, xAI, OpenRouter, MiniMax,
-DeepSeek, Qwen, Kimi, GLM — plus `custom`, which takes any endpoint speaking
-Anthropic Messages or OpenAI Chat Completions.
+One went out as Anthropic Messages, the other as OpenAI Chat Completions. The
+request bodies differed by `model_credential_id` and nothing else.
+
+## Before you start
+
+A token, and **two** connections to switch between — the whole point. Gobare is
+bring-your-own-key: the model bill is yours, the computer is ours. Nine
+connectors are built in (Anthropic, OpenAI, xAI, OpenRouter, MiniMax, DeepSeek,
+Qwen, Kimi, GLM) plus `custom`, which takes any endpoint speaking Anthropic
+Messages or OpenAI Chat Completions.
 
 ## See what you have connected
 
@@ -24,57 +34,62 @@ curl -s "$GOBARE_API/v1/model-credentials" -H "Authorization: Bearer $GOBARE_TOK
 {
   "object": "list",
   "data": [
-    { "object": "model_credential", "id": "kl5yieo4ne9zhy2", "label": "MiniMax",
+    { "object": "model_credential", "id": "yu7u7hurzewanyl", "label": "MiniMax",
       "connector": "minimax", "model": "MiniMax-M3", "is_default": true },
-    { "object": "model_credential", "id": "ixwugzpk3pyt8cb", "label": "MiniMax via OpenAI protocol",
+    { "object": "model_credential", "id": "ybycd8m28v0o2yd", "label": "MiniMax via OpenAI protocol",
       "connector": "custom", "model": "MiniMax-M3", "is_default": false }
   ]
 }
 ```
 
-Names, models and ids. Never a key, and never a base URL — one is a secret, and
+Names, models and ids. Never a key, and never a base URL — one is a secret and
 the other is deployment detail you should not build against.
 
-Connections are created in the Console. Creating one through the API would mean
-accepting a provider key over the API, which is a different permission model and
-a decision of its own.
-
-## Run it on one connection
+To add one without opening a browser:
 
 ```bash
-curl -s -X POST $GOBARE_API/v1/sessions \
+curl -s -X POST $GOBARE_API/v1/model-credentials \
   -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' \
-  -d '{
-    "agent": { "model": "MiniMax-M3", "model_credential_id": "kl5yieo4ne9zhy2" },
-    "input": "Write /workspace/outputs/report.md listing the files in the current directory, one per line."
-  }'
+  -d '{"key":"sk-ant-api03-…"}'
 ```
 
-`agent.model` has to match the model that connection runs. A mismatch is
-refused, and the refusal tells you what is actually available:
+The provider is read from the shape of the key rather than guessed at, and the
+connection is verified against that provider before it is stored — so a wrong
+key fails here, not inside your first turn. Needs the `credentials:write`
+scope. See [model-credentials.md](../model-credentials.md).
 
-```json
-{ "error": { "code": "invalid_request",
-  "message": "This organization's selected connection runs MiniMax-M3, not gpt-4o. Pass agent.model_credential_id to choose a different connection, or connect gpt-4o in the Console under Settings › LLM Models." } }
+## The switch
+
+```tab:python
+TASK = "Write /workspace/outputs/report.md listing the files in /workspace, one per line."
+
+for credential in call("GET", "/v1/model-credentials")["data"]:
+    call("POST", "/v1/sessions", {
+        "agent": {
+            "model": credential["model"],
+            "model_credential_id": credential["id"],   # ← the only difference
+        },
+        "input": TASK,
+    })
 ```
+```tab:typescript
+const TASK = "Write /workspace/outputs/report.md listing the files in /workspace, one per line.";
 
-## Run the same thing on another
-
-```bash
-curl -s -X POST $GOBARE_API/v1/sessions \
-  -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' \
-  -d '{
-    "agent": { "model": "MiniMax-M3", "model_credential_id": "ixwugzpk3pyt8cb" },
-    "input": "Write /workspace/outputs/report.md listing the files in the current directory, one per line."
-  }'
+for (const credential of (await call("GET", "/v1/model-credentials")).data) {
+  await call("POST", "/v1/sessions", {
+    agent: {
+      model: credential.model,
+      model_credential_id: credential.id,          // ← the only difference
+    },
+    input: TASK,
+  });
+}
 ```
 
 **Only `model_credential_id` changed.** The task, the tools, the instructions
-and the way you collect results are untouched.
-
-The second connection takes an entirely different path: a different connector,
-a different base URL, and a different protocol adapter. The agent in the
-workspace knows nothing about any of it.
+and the way you collect results are untouched. The second connection takes an
+entirely different path — different connector, different base URL, different
+protocol adapter — and the agent in the workspace knows nothing about any of it.
 
 ## Confirm they really differed
 
@@ -111,15 +126,39 @@ change the default, and every session that does not override it follows.
 
 ## What to know
 
-**Connections are created in the Console.** `/v1` is read-only here.
+**A running session can be moved.** `PATCH /v1/sessions/{id}` with
+`agent.model` and `agent.model_credential_id` together switches the connection
+in place — the workspace, the transcript and the tools all stay:
+
+```bash
+curl -s -X PATCH $GOBARE_API/v1/sessions/$SESSION \
+  -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' \
+  -d '{"agent":{"model":"MiniMax-M3","model_credential_id":"ixw…"}}'
+```
+
+Both fields or neither: one connection runs one model, so naming half of the
+pair would leave the session pointing at a combination nobody checked. A
+connection that does not belong to your organization, or does not offer that
+model, is refused and the session does not move.
+
+This page used to say there was no way to do it, and told you to start a new
+session. That cost the workspace and the transcript, on a product whose next
+guide is called "work that spans hours".
 
 **`agent.model` must match the connection.** One connection runs one model;
 moving between two models from the same vendor means two connections.
-
-**Switching does not migrate running sessions.** A session is bound to the
-connection it was created with. Changing providers affects new sessions.
 
 **Capabilities are not normalised across providers.** One may not accept
 images; another has a smaller context window. Those differences reach your
 agent's behaviour unchanged. `GET /v1/model-credentials` tells you what is
 connected, not what each one can do.
+
+## When it goes wrong
+
+| What you see | Why | Fix |
+| --- | --- | --- |
+| `400` naming a model you did not ask for | `agent.model` does not match what that connection runs | The message names what *is* connected; one connection runs one model |
+| `400` naming a credential id | The id is not one of this organization's | `GET /v1/model-credentials` — an id from another org reads as not found |
+| The same model behaves differently after a switch | Capabilities are not normalised across providers | Context windows, image support and tool-calling fidelity differ. Re-test, do not assume |
+| A running session did not move | The `PATCH` was refused, or only half the pair was sent | Read the error: it names the connection problem. Both `agent.model` and `agent.model_credential_id` are required together |
+| `403 permission_denied` on `POST` | The token lacks `credentials:write` | Mint one with that scope, or connect it in the Console |

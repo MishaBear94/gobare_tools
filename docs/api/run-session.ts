@@ -12,11 +12,25 @@
  * It is published by scripts/publish-api-docs.sh, which copies this file next
  * to the pages that link to it.
  *
- * ── Why this exists when there is no SDK ──
- * We decided not to publish a client package (07-HARDENING-PLAN §N4.3): a
- * second surface is a second thing to keep in step. But "read the docs and
- * write the loop" understated the cost, because three of the things that loop
- * has to get right are wrong silently:
+ * ── Why this exists now that there *is* an SDK ──
+ * It used to say "we decided not to publish a client package". That decision
+ * (07-HARDENING-PLAN §N4.3) has been reversed — `sdk/ts` is the client library
+ * — and the obvious next thought, that this file should move into it, is
+ * wrong.
+ *
+ * The two artifacts have different readers. `@gobare/api` is for someone who
+ * has already chosen us and will add a dependency. This file is for someone
+ * deciding, who wants to read the whole loop in one screen and run it with
+ * `node run-session.ts`. That is why it imports nothing — see the note on the
+ * error class below, which avoids TypeScript that Node cannot strip. Give it
+ * an `import { Transport } from "../transport.ts"` and it stops being the
+ * thing it is for.
+ *
+ * So it stays, and stays dependency-free. Where they overlap, the SDK is the
+ * one to change first: this file is an example, and an example that grows
+ * features stops being readable in one screen.
+ *
+ * The three things the loop has to get right, all of which fail silently:
  *
  *   1. Subscribe before you send. Reversed, you miss the opening events — and
  *      only when the agent is fast, which is to say only sometimes.
@@ -111,9 +125,21 @@ function hash(input: string): string {
 }
 
 class ApiFailure extends Error {
-  constructor(readonly status: number, readonly code: string, message: string, readonly requestId?: string) {
+  // Declared and assigned rather than written as constructor parameter
+  // properties. That shorthand is TypeScript that has no JavaScript to erase
+  // to, so `node run-session.ts` refuses the file outright with
+  // ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX — and running it directly is the whole
+  // point of a file whose pitch is "copy it into your project".
+  readonly status: number;
+  readonly code: string;
+  readonly requestId?: string;
+
+  constructor(status: number, code: string, message: string, requestId?: string) {
     super(`${code}: ${message}${requestId ? ` (request ${requestId})` : ""}`);
     this.name = "ApiFailure";
+    this.status = status;
+    this.code = code;
+    this.requestId = requestId;
   }
 }
 

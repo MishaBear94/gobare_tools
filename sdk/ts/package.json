@@ -1,0 +1,19 @@
+{
+  "name": "@gobare/api",
+  "version": "0.1.0",
+  "description": "The official TypeScript client for the Gobare Agent API.",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "sideEffects": false
+}

@@ -15,7 +15,7 @@ curl -s -X POST $GOBARE_API/v1/sessions \
 Send the same key again and you get the same status and the same body — the
 same session, not a second one.
 
-## What the key covers
+## Coverage
 
 A key is scoped to **your token, the method and the path**. The same key used on
 a different endpoint is a different key, and one organization's keys are
@@ -40,7 +40,7 @@ After 24 hours the record is gone and the same key acts for the first time
 again. That is long enough to cover any retry a client should be making, and
 short enough that the table does not grow forever.
 
-## What is not recorded
+## Not covered
 
 A refusal. If a call is rejected — bad input, missing scope, rate limited — no
 answer is stored, so your retry is a real attempt rather than a replay of a
@@ -58,3 +58,29 @@ The one case worth a key even in simple clients is `POST /v1/sessions`. A
 network timeout on session creation is otherwise indistinguishable from a
 failure, and retrying leaves you with two sandboxes and a concurrency limit you
 are now closer to.
+
+## Next
+
+- [errors](errors.md) — what a retry can meet
+- [limits](limits.md) — how often you may retry
+
+## Two calls, one key, at the same time
+
+A dropped connection followed by an immediate retry is the case this header
+exists for, and most HTTP clients retry **in parallel** with the request they
+think died. So the key is claimed before the work starts, not recorded after it
+finishes.
+
+The second caller gets `409 conflict`:
+
+```json
+{ "error": { "code": "conflict",
+  "message": "A request with Idempotency-Key \"job-8842\" is already in flight. Retry in a moment; if it succeeded, the retry replays its answer rather than acting again." } }
+```
+
+Retry shortly and you get the first call's answer. Refused rather than made to
+wait, because waiting means holding your connection open for work whose
+duration we do not control, and a timeout is not something you can act on.
+
+A call that fails releases its key, so the retry most likely to succeed is not
+the one guaranteed to fail.

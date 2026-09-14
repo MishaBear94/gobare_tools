@@ -1,0 +1,28 @@
+[project]
+name = "gobare"
+version = "0.1.0"
+description = "The official Python client for the Gobare Agent API."
+requires-python = ">=3.11"
+# The counterpart of `"private": true` on the TypeScript package. PEP 621 has no
+# `private` key, and this classifier is what PyPI itself refuses an upload on —
+# so it is a real guard rather than a note. Remove it to publish; a test then
+# requires docs/api/python.md to teach the install, so the page cannot lag the
+# release.
+classifiers = ["Private :: Do Not Upload"]
+# Deliberately empty. A client for an API is not a reason to pull a dependency
+# into someone's service; `urllib`, `hmac` and `json` are enough for everything
+# here, including the event stream.
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gobare"]
+
+[tool.hatch.build.targets.sdist]
+# The wheel takes `packages` above; the sdist takes everything by default,
+# which would ship the test suite and the docs-snippet guard that reaches up
+# into ../../docs. Neither is any use to someone installing the client.
+include = ["gobare", "README.md", "pyproject.toml"]

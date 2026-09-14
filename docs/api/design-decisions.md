@@ -20,7 +20,7 @@ To change what a running turn is doing, say so explicitly:
 {"events":[{"type":"input.steer","content":"Stop and just write the tests."}]}
 ```
 
-`input.steer` with no turn running is a `conflict` rather than a new turn.
+[`input.steer`](input.md) with no turn running is a `conflict` rather than a new turn.
 
 **Why.** Whether a turn is in flight is decided from two signals — the live
 bridge and the durable session status — because reading only one of them
@@ -76,7 +76,7 @@ and we never see the key in a request. Sandbox compute is ours.
 `approval` and `question` for a person.
 
 An integration can therefore *see* that a human is holding up a session it cares
-about, rather than watching it sit in `waiting` for no visible reason. Those two
+about, rather than watching it sit in `requires_action` for no visible reason. Those two
 are answered in the Console, not through this API.
 
 **Why.** Gobare had a human-in-the-loop path before it had this API, and
@@ -118,3 +118,8 @@ rejected.
 - **Ids are ours.** Session ids are UUIDs; turns are `turn_…`; artifacts are
   `art_5e2b9017c4d63a8f`; webhook subscriptions are `whsub_6c1e40b9a72d58f3`. Do not parse them.
 - **Times are milliseconds since the epoch**, as numbers.
+
+## Next
+
+- [troubleshooting](troubleshooting.md) — something behaves unexpectedly
+- [changelog](changelog.md) — what changed recently

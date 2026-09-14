@@ -44,8 +44,10 @@ Answering is [required-actions.md](required-actions.md); the loop is written
 for you in [`run-session.ts`](run-session.ts).
 
 **A turn waiting on you is still in flight.** The workspace is not reclaimed
-out from under it, however long you take — but the turn does have a deadline,
-and the session has the ceiling in [limits.md](limits.md).
+out from under it, however long you take. There is no deadline on the answer
+unless you set one — `timeout_seconds` on the tool, see
+[required-actions.md](required-actions.md) — and the only ceiling either way is
+the workspace's two hours, in [limits.md](limits.md).
 
 ---
 
@@ -115,24 +117,56 @@ conclude the model was weak — that is the mistake this item exists to prevent.
 ```
 
 With `required: true` the session fails loudly instead of running crippled, and
-you get an error rather than a confused answer.
+you get an error rather than a confused answer. It arrives on the first call
+that needs the workspace — sending a message, writing a file — and it names the
+server and what went wrong:
+
+```json
+{"error":{"code":"invalid_request",
+  "message":"This session cannot start: required MCP server(s) failed to initialise — docs: fetch failed. That server is configured with `required: true`, so the session refuses to run without it — fix the server, or set `required: false` to let the agent continue with fewer tools."}}
+```
+
+`invalid_request` rather than a retryable code, deliberately: waiting will not
+make the server reachable. This is a configuration to change, not a state to
+wait out.
 
 > **Choose deliberately.** `required: false` and a broken URL is the one
 > combination that produces no signal anywhere a caller can see it. If you are
 > not sure, `required: true` is the safer default for anything the task
 > actually depends on.
 
+`required` must be `true` or `false`. A string — `"required": "yes"` — is
+refused rather than read as `false`, because `false` is a real choice here and
+not one you would have made by writing the word required.
+
 ---
 
-## Reading back what is set
+## Reading the configuration back
 
 ```bash
 curl https://api.gobare.dev/v1/sessions/$SESSION/tools \
   -H "Authorization: Bearer $GOBARE_TOKEN"
 ```
 
-Returns the configuration as stored. Secrets you supplied in `authorization`
-and `headers` are **not** returned.
+```json
+{"object":"session.tools","session_id":"3f9c1b60-…",
+ "tools":[{"type":"mcp","name":"docs","url":"https://mcp.example.com/mcp",
+           "allowed_tools":["search"],"redacted":["authorization"]}],
+ "text":null}
+```
+
+The answer is in the same vocabulary you sent: one `tools` array, each entry
+carrying its `type`. The same shape goes back to `PUT`.
+
+**Secrets are not returned.** `authorization` and every header value are held
+back, and `redacted` names what was withheld — so a server with credentials
+configured is distinguishable from one without, which an omission alone would
+not tell you.
+
+`redacted` is not a request field. If you read the configuration, change
+something and `PUT` it back, you get a `400` naming `redacted` rather than a
+success that quietly replaced your credentials with nothing. Re-send the
+secrets, or build the body from your own source.
 
 ---
 
@@ -147,6 +181,13 @@ and `headers` are **not** returned.
 | A `url` that will not parse | `400 invalid_request` |
 | `POST` instead of `PUT` | `400 invalid_request` — the tool set is replaced, not appended |
 | An unknown field | `400 invalid_request`, naming the field |
+| An unknown field **inside a tool entry** — `allowedTools` for `allowed_tools`, `cmd` for `command`, `timeout` for `timeout_seconds` | `400 invalid_request`, naming the field and listing what the entry accepts |
+| `redacted`, sent back from a read | `400 invalid_request` — re-send the secret itself |
 
 Every refusal carries `{ error: { code, message, request_id } }` — see
 [errors.md](errors.md).
+
+## Next
+
+- [required actions](required-actions.md) — answer a call the agent makes
+- [extracting structured data](guides/extracting-structured-data.md) — shape what comes back
