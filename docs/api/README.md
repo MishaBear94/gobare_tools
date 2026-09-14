@@ -144,6 +144,7 @@ transient events, and what `completed` does not mean.
 | | |
 | --- | --- |
 | **Run one task and collect the result** | [quickstart.md](quickstart.md) |
+| **Put it in a service and keep it running** | [production-integration.md](production-integration.md) |
 | **Call it from TypeScript, with types** | [typescript.md](typescript.md) |
 | **Call it from Python, with types** | [python.md](python.md) |
 | **Let the agent call your own code** | [required-actions.md](required-actions.md) |
@@ -160,6 +161,7 @@ API and is what the Console uses.
 | Page | Read it when |
 | --- | --- |
 | [quickstart.md](quickstart.md) | First time. Token to completed turn, in one page |
+| [production-integration.md](production-integration.md) | It works, and now it has to keep working |
 | [typescript.md](typescript.md) | You are past `curl` and putting this in a service |
 | [python.md](python.md) | The same, in Python |
 | [model-credentials.md](model-credentials.md) | You want to connect a model without opening the Console |
