@@ -3,7 +3,6 @@
 > Published from the Gobare product repository. The canonical page is
 > <https://docs.gobare.dev/guides/showing-the-agents-work> — read it there; this copy is for offline and for tooling.
 
-
 Your users are watching an agent work. A spinner and the word "processing" is a
 poor showing — what they want is what it is reading, what it changed, what it
 ran, and what came out, with the ability to scroll back afterwards.

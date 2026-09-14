@@ -3,7 +3,6 @@
 > Published from the Gobare product repository. The canonical page is
 > <https://docs.gobare.dev/guides/switching-model-providers> — read it there; this copy is for offline and for tooling.
 
-
 The same agent and the same task, running on a different model tomorrow than it
 did today — because of price, because one model is better at your work, because
 a vendor had an outage, or because someone decided the data must not leave a

@@ -3,7 +3,6 @@
 > Published from the Gobare product repository. The canonical page is
 > <https://docs.gobare.dev/input> — read it there; this copy is for offline and for tooling.
 
-
 Everything you can send a session, in one place.
 
 All four go to the same endpoint, one per request:

@@ -3,7 +3,6 @@
 > Published from the Gobare product repository. The canonical page is
 > <https://docs.gobare.dev/changelog> — read it there; this copy is for offline and for tooling.
 
-
 What changed in `/v1`, newest first. Additions only unless a line says
 otherwise — a field appearing is not a breaking change, and nothing here has
 removed one.

@@ -3,7 +3,6 @@
 > Published from the Gobare product repository. The canonical page is
 > <https://docs.gobare.dev/> — read it there; this copy is for offline and for tooling.
 
-
 **Run a coding agent from your own code.** Not a model that writes code back to
 you — an agent with a computer, that writes files, runs them, and leaves what it
 built at a URL you can open.

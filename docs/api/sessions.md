@@ -3,7 +3,6 @@
 > Published from the Gobare product repository. The canonical page is
 > <https://docs.gobare.dev/sessions> — read it there; this copy is for offline and for tooling.
 
-
 Everything `POST /v1/sessions` accepts, and what each field is for.
 
 The [quickstart](quickstart.md) creates a session with a model and nothing
