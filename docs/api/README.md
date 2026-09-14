@@ -1,20 +1,143 @@
 # Gobare Agent API
 
-Run a coding agent from your own code. A session is a cloud computer with an
-agent on it: you create one, send it work, and read what it did — and what it
-built can be left running at a public URL.
+**Run a coding agent from your own code.** Not a model that writes code back to
+you — an agent with a computer, that writes files, runs them, and leaves what it
+built at a URL you can open.
 
-```bash
-curl -s -X POST https://api.gobare.dev/v1/sessions \
-  -H "Authorization: Bearer $GOBARE_TOKEN" \
-  -H 'content-type: application/json' \
-  -d '{"agent":{"model":"MiniMax-M3"},
-       "input":"Write /workspace/outputs/hello.txt saying hello, then tell me you did."}'
+```
+Your application
+     │  one API call
+     ▼
+   Gobare ──► coding agent ──► a cloud computer
+                                ├── a real workspace
+                                ├── a shell it installs and runs in
+                                ├── your tools: functions, MCP
+                                └── a public URL for what it built
 ```
 
-That is a complete request. The agent gets a workspace, does the work, and the
-file it wrote is downloadable afterwards — see the
-[quickstart](quickstart.md) for the token, the wait, and the download.
+**You bring the model key.** Gobare does not sell you inference — it runs an
+agent against a connection your organization owns, on a sandbox Gobare provides.
+You pay your model provider for tokens and Gobare for the computer.
+
+## A minute, start to finish
+
+This asks for something to be built, waits, and prints an address. Nothing is
+elided — it is the whole program.
+
+```tab:bash
+SESSION=$(curl -s -X POST https://api.gobare.dev/v1/sessions \
+  -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' \
+  -d '{"agent":{"model":"MiniMax-M3"},
+       "input":"Build a small expense tracker web page — a form to add an expense, a running total, saved in localStorage. Serve it on port 8000 and keep the server running."}' \
+  | jq -r .id)
+
+until [ "$(curl -s "https://api.gobare.dev/v1/sessions/$SESSION/turns?limit=1" \
+  -H "Authorization: Bearer $GOBARE_TOKEN" | jq -r '.data[0].status // "pending"')" != "working" ]; do sleep 5; done
+
+curl -s -X POST "https://api.gobare.dev/v1/sessions/$SESSION/preview" \
+  -H "Authorization: Bearer $GOBARE_TOKEN" -H 'content-type: application/json' -d '{}' | jq -r .url
+```
+```tab:typescript
+const API = "https://api.gobare.dev";
+const AUTH = { Authorization: `Bearer ${process.env.GOBARE_TOKEN}`, "content-type": "application/json" };
+
+const call = async (method: string, path: string, body?: unknown) =>
+  (await fetch(API + "/v1" + path, { method, headers: AUTH, body: body && JSON.stringify(body) })).json();
+
+const session = await call("POST", "/sessions", {
+  agent: { model: "MiniMax-M3" },
+  input: "Build a small expense tracker web page — a form to add an expense, a running " +
+         "total, saved in localStorage. Serve it on port 8000 and keep the server running.",
+});
+
+for (;;) {
+  const [turn] = (await call("GET", `/sessions/${session.id}/turns?limit=1`)).data;
+  if (turn && turn.status !== "working") break;
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+}
+
+console.log((await call("POST", `/sessions/${session.id}/preview`, {})).url);
+```
+```tab:python
+import json, os, time, urllib.request
+
+API, TOKEN = "https://api.gobare.dev", os.environ["GOBARE_TOKEN"]
+AUTH = {"Authorization": "Bearer " + TOKEN, "content-type": "application/json"}
+
+def call(method, path, body=None):
+    return json.load(urllib.request.urlopen(urllib.request.Request(
+        API + "/v1" + path, data=json.dumps(body).encode() if body is not None else None,
+        headers=AUTH, method=method)))
+
+session = call("POST", "/sessions", {
+    "agent": {"model": "MiniMax-M3"},
+    "input": "Build a small expense tracker web page — a form to add an expense, a running "
+             "total, saved in localStorage. Serve it on port 8000 and keep the server running.",
+})
+
+while True:
+    turns = call("GET", f"/sessions/{session['id']}/turns?limit=1")["data"]
+    if turns and turns[0]["status"] != "working":
+        break
+    time.sleep(5)
+
+print(call("POST", f"/sessions/{session['id']}/preview", {})["url"])
+```
+
+```
+https://s-a23a2eb878db4d8bbefd.gobare.dev
+```
+
+Open it. There is a working page there, served from the computer the agent was
+given — a form, a running total, saved in the browser. **Forty-nine seconds on
+one run of this, a hundred and eleven on another**; the difference is how long
+the sandbox took to come up.
+
+You need a token for this. It takes a minute and the
+[quickstart](quickstart.md) has it.
+
+## What just happened
+
+Five nouns, and they nest:
+
+```
+Agent      a named configuration: model, instructions, tools
+  │        (optional — a session can carry its own)
+  ▼
+Session    one cloud computer. Its workspace persists between
+  │        rounds and survives being paused
+  ▼
+Turn       one piece of work, from your message until it settles
+  │
+  ├──► Items      the record: messages, tool calls, file changes
+  ├──► Events     the same, as it happens: streamable, resumable
+  ├──► Artifacts  files it published — they outlive the computer
+  └──► Preview    a port it serves, optionally at a public URL
+```
+
+The session is the thing to hold on to. Everything else is reached through it,
+and a session you created yesterday still answers today — its computer may have
+been reclaimed and rebuilt, and the conversation does not restart.
+
+## Why this and not a model API
+
+A model API returns text. You would still be writing the part that actually
+runs: a sandbox and its lifecycle, an agent loop, tool dispatch, file capture,
+streaming, resumption after a dropped connection, and somewhere for a person to
+approve something before it happens.
+
+That list is the product. It is also why there is
+[no sandbox-free mode](design-decisions.md) — for a coding agent the workspace
+is not an accessory.
+
+What Gobare deliberately does **not** do: sell you inference, choose your model,
+or hold your conversation state in your process. The first is why you connect
+your own key; the last is why a session is a URL you can come back to rather
+than an object you keep in memory.
+
+Coming from another Agents API? [design-decisions.md](design-decisions.md) lists
+where this one diverges and why — queueing versus steering, durable versus
+transient events, and what `completed` does not mean.
 
 ## Common tasks
 

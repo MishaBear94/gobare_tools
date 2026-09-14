@@ -74,29 +74,6 @@ curl -s $GOBARE_API/v1/health -H "Authorization: Bearer $GOBARE_TOKEN"
 `/v1/health` answers for any valid token, whatever its scopes — it is how you
 find out what a token can do without guessing.
 
-### What each scope unlocks
-
-| Scope | Endpoints |
-| --- | --- |
-| `sessions:read` | Reading sessions, turns, items, agents, webhook subscriptions, model connections, and both event streams |
-| `sessions:write` | Creating, renaming and deleting sessions; sending input (`input.message`, `input.steer`, `input.cancel`); replacing tools; agents; **creating and deleting webhook subscriptions** |
-| `tools:respond` | `input.tool_result` — answering a required action, and nothing else |
-| `artifacts:read` | Listing and downloading artifacts. **Not deleting** — that is `sessions:write`, because a scope named read must not destroy anything |
-| `credentials:write` | Connecting and removing model providers |
-| `cli` | `gobare pi import` only. Refused by every `/v1` route |
-
-A call missing its scope is `403 permission_denied`, and the message names the
-scope it wanted — so you never have to guess which one you left out.
-
-`sessions:read` + `artifacts:read` is the read-only shape, and it really is
-read-only: nothing it holds can delete, cancel or write.
-
-`sessions:read` + `tools:respond` is a worker: it can watch a session and answer
-its function calls, and it cannot send a message, cancel a turn or delete
-anything. That is the token to give a fleet of tool handlers. The two scopes are
-exact in both directions — `sessions:write` alone does not answer a tool call,
-and `tools:respond` alone does not drive a session.
-
 ## 3. Set up your caller
 
 Pick your language once — the rest of this page, and the whole site, follows
@@ -410,6 +387,32 @@ call("DELETE", f"/sessions/{session['id']}")
 Deleting a session destroys its sandbox. Concurrent sessions are capped — see
 [limits.md](limits.md) — so a client that creates and never deletes will stop
 being able to create.
+
+## Tokens and scopes
+
+| Scope | Endpoints |
+| --- | --- |
+| `sessions:read` | Reading sessions, turns, items, agents, webhook subscriptions, model connections, and both event streams |
+| `sessions:write` | Creating, renaming and deleting sessions; sending input (`input.message`, `input.steer`, `input.cancel`); replacing tools; agents; **creating and deleting webhook subscriptions** |
+| `tools:respond` | `input.tool_result` — answering a required action, and nothing else |
+| `artifacts:read` | Listing and downloading artifacts. **Not deleting** — that is `sessions:write`, because a scope named read must not destroy anything |
+| `credentials:write` | Connecting and removing model providers |
+| `cli` | `gobare pi import` only. Refused by every `/v1` route |
+
+A call missing its scope is `403 permission_denied`, and the message names the
+scope it wanted — so you never have to guess which one you left out.
+
+`sessions:read` + `artifacts:read` is the read-only shape, and it really is
+read-only: nothing it holds can delete, cancel or write.
+
+`sessions:read` + `tools:respond` is a worker: it can watch a session and answer
+its function calls, and it cannot send a message, cancel a turn or delete
+anything. That is the token to give a fleet of tool handlers. The two scopes are
+exact in both directions — `sessions:write` alone does not answer a tool call,
+and `tools:respond` alone does not drive a session.
+
+A call missing its scope is `403 permission_denied`, and the message names the
+scope it wanted — so you never have to guess which one you left out.
 
 ## Full example in TypeScript
 

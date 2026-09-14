@@ -12,6 +12,16 @@ addresses, and the difference is who can open them.
 | `preview.url` | You, holding a token | As long as the workspace does |
 | `preview.published_url` | Anyone with the link | Until you unpublish it |
 
+**`preview.url` opened in a browser shows the Console, not your app.** It is
+scoped to a caller holding a token, and an anonymous request is not refused —
+it falls through to `app.gobare.dev` and answers `200` with the Console's own
+page. So a reader who copies that address out of a session, pastes it into a
+tab and sees something that is plainly not what the agent built concludes the
+agent built nothing.
+
+`published_url` is the one to hand to anyone else, and it is null until you
+publish. That is the next section.
+
 ## Requirements
 
 Publishing exposes a port. The agent must have started a server on it and told
