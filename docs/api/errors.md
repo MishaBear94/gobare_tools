@@ -26,6 +26,20 @@ nothing until the day it is the only thing that helps.
 
 ## The codes
 
+A `401` also carries `WWW-Authenticate: Bearer realm="gobare", error="…"` —
+the standard challenge, so an HTTP client learns the scheme without being
+configured for it.
+
+**The `Retry` column is also on the wire.** Every code marked retryable carries
+a `Retry-After` header; the ones marked `no` carry none, and the absence is the
+signal — `project_limit_exceeded` is a 429 and `provider_unauthorized` is a 502,
+and neither is a wait. A client that honours `Retry-After` and gives up without
+one is doing the right thing on every row below without knowing any of them.
+
+The numbers are a floor on politeness rather than a prediction. Where we can
+compute the real wait — the rate limiter, the stream ceiling — we send that
+instead.
+
 | Code | Status | Retry | Meaning |
 | --- | --- | --- | --- |
 | `invalid_request` | 400 | no | The request is malformed, or a field is wrong. Includes a body over the size ceiling |

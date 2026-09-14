@@ -12,6 +12,7 @@ import type { Transport, RequestOptions } from "../transport.ts";
 // ── Wire types ──────────────────────────────────────────────────────────────
 
 export type Agent = {
+  /** Always `agent`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "agent";
   /** Ours. Pass it as `agent.id` when creating a session. */
   id: string;
@@ -45,27 +46,36 @@ export type AgentConfig = {
   approval_mode?: "auto" | "per_step" | "read_only" | "plan";
   /** Path rules evaluated before a write. */
   permission_rules?: Array<Record<string, unknown>>;
+  /** What the agent may reach outside the workspace: your own functions, MCP servers, and which built-ins. Everything inside the workspace — shell, files, git — is always there and is not configured here. */
   tools?: ToolRequest[];
+  /** Shaping the final message: how much it says, and whether it must conform to a JSON Schema. */
   text?: TextConfig;
 };
 
 export type AgentCreateRequest = {
   /** Yours, for recognising it. */
   name: string;
+  /** Must be one the chosen credential runs. A session started from this agent may override it. */
   model?: string;
+  /** Omit to use the organization's default. */
   model_credential_id?: string;
+  /** Standing instructions every session started from this agent begins with. */
   instructions?: string;
+  /** What the agent may reach outside the workspace: your own functions, MCP servers, and which built-ins. Everything inside the workspace — shell, files, git — is always there and is not configured here. */
   tools?: ToolRequest[];
+  /** Shaping the final message: how much it says, and whether it must conform to a JSON Schema. */
   text?: TextConfig;
 };
 
 export type AgentList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: Agent[];
 };
 
 /** An immutable copy of a file a turn published. Survives the sandbox being paused or reclaimed. */
 export type Artifact = {
+  /** Always `artifact`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "artifact";
   /** Ours. Use it to fetch the bytes. */
   id: string;
@@ -84,6 +94,7 @@ export type Artifact = {
 };
 
 export type ArtifactList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: Artifact[];
   has_more?: boolean;
@@ -91,12 +102,14 @@ export type ArtifactList = {
 };
 
 export type Deleted = {
+  /** Always `session.deleted`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "session.deleted";
   id: string;
   deleted: boolean;
 };
 
 export type EnvironmentProfile = {
+  /** Always `environment_profile`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "environment_profile";
   id: string;
   name: string;
@@ -105,12 +118,14 @@ export type EnvironmentProfile = {
 };
 
 export type EnvironmentProfileList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: EnvironmentProfile[];
 };
 
 /** A named configuration copied into a session at creation. Changing or deleting it does not affect sessions already created from it. */
 export type EnvironmentTemplate = {
+  /** Always `environment_template`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "environment_template";
   id: string;
   name: string;
@@ -122,6 +137,7 @@ export type EnvironmentTemplate = {
 };
 
 export type EnvironmentTemplateList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: EnvironmentTemplate[];
 };
@@ -139,10 +155,12 @@ export type Error = {
 
 /** One event per request. Batching has no meaning while the vocabulary is this small. */
 export type EventsRequest = {
+  /** Exactly one event. What it does depends on its `type` — send a message, answer a tool call, approve, steer or cancel. */
   events: InputEvent[];
 };
 
 export type FilesRequest = {
+  /** Files to write into the running workspace. Same shape as `environment.files`, which seeds one before the first turn. */
   files: SeedFile[];
 };
 
@@ -155,6 +173,7 @@ export type Fork = {
 };
 
 export type Health = {
+  /** Always `health`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "health";
   status: "ok";
   version: "v1";
@@ -162,6 +181,7 @@ export type Health = {
 };
 
 export type InputAccepted = {
+  /** Always `input.accepted`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "input.accepted";
   session_id: string;
   type: "input.message" | "input.cancel" | "input.tool_result" | "input.steer";
@@ -194,6 +214,7 @@ export type InputEvent = {
 };
 
 export type Item = {
+  /** Always `item`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "item";
   /** Ours. Stable; use it as a paging cursor. */
   id: string;
@@ -212,6 +233,7 @@ export type Item = {
 };
 
 export type ItemList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: Item[];
   has_more?: boolean;
@@ -219,6 +241,7 @@ export type ItemList = {
 };
 
 export type ModelConnector = {
+  /** Always `model_connector`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "model_connector";
   /** What to send as `provider` when connecting a key. */
   id: string;
@@ -236,11 +259,13 @@ export type ModelConnector = {
 
 /** The model providers this deployment can connect. Served without a token, like the OpenAPI document: it describes what the API supports rather than anything inside an organization. */
 export type ModelConnectorCatalog = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: ModelConnector[];
 };
 
 export type ModelCredential = {
+  /** Always `model_credential`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "model_credential";
   /** Pass as agent.model_credential_id. */
   id: string;
@@ -274,11 +299,13 @@ export type ModelCredentialCreateRequest = {
 };
 
 export type ModelCredentialList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: ModelCredential[];
 };
 
 export type Preview = {
+  /** Always `preview`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "preview";
   /** The label the site is served under. */
   subdomain: string;
@@ -289,6 +316,7 @@ export type Preview = {
 };
 
 export type PreviewDeleted = {
+  /** Always `preview.deleted`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "preview.deleted";
   id: string;
   deleted: boolean;
@@ -328,6 +356,7 @@ export type SeedFile = {
 };
 
 export type Session = {
+  /** Always `session`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "session";
   /** Ours, not yours. Use `metadata` to carry your own identifier. */
   id: string;
@@ -384,6 +413,7 @@ export type Session = {
 
 /** Everything optional. A session with only a model is a complete session. */
 export type SessionCreateRequest = {
+  /** What runs, and how freely. Omit every field and the organization's default connection runs it. */
   agent?: AgentConfig;
   /** What the workspace starts with. */
   environment?: {
@@ -405,6 +435,7 @@ export type SessionCreateRequest = {
 };
 
 export type SessionList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: Session[];
   has_more?: boolean;
@@ -413,16 +444,21 @@ export type SessionList = {
 
 /** Only the fields present are changed. */
 export type SessionPatchRequest = {
+  /** `null` clears it. */
   title?: string | null;
   /** `null` clears every label. */
   metadata?: Record<string, string> | null;
+  /** Change what runs, mid-session. The workspace and the transcript are kept either way. */
   agent?: {
     /** Move this running session to another connection. Send with `model_credential_id`; the workspace and the transcript are kept. */
     model?: string;
     /** The connection to move to. It must offer the named model — one connection runs one model. */
     model_credential_id?: string;
+    /** Standing instructions from the next turn on. `null` clears an inherited one. */
     instructions?: string | null;
+    /** How much the agent may do without asking, from the next turn on. */
     approval_mode?: "auto" | "per_step" | "read_only" | "plan";
+    /** Path rules evaluated before a write. Replaces the existing rules rather than adding to them. */
     permission_rules?: Array<Record<string, unknown>>;
   };
 };
@@ -464,6 +500,7 @@ export type Tool = {
 };
 
 export type ToolConfig = {
+  /** Always `session.tools`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "session.tools";
   /** The session this configuration applies to. */
   session_id: string;
@@ -506,11 +543,14 @@ export type ToolRequest = {
 
 /** What the agent may call. Replaces the session's whole configuration — entries are not merged with what is already there. */
 export type ToolsRequest = {
+  /** What the agent may reach outside the workspace: your own functions, MCP servers, and which built-ins. Everything inside the workspace — shell, files, git — is always there and is not configured here. An empty array leaves the session with no route to the network at all. */
   tools?: ToolRequest[];
+  /** Shaping the final message: how much it says, and whether it must conform to a JSON Schema. */
   text?: TextConfig;
 };
 
 export type Turn = {
+  /** Always `turn`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "turn";
   /** Ours. Quote it when reporting a problem with this turn. */
   id: string;
@@ -540,6 +580,7 @@ export type Turn = {
 };
 
 export type TurnList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: Turn[];
   has_more?: boolean;
@@ -567,6 +608,7 @@ export type WebhookDeliveryHealth = {
 
 /** An endpoint subscribed to session events. The secret is returned only when it is created. */
 export type WebhookSubscription = {
+  /** Always `webhook.subscription`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "webhook.subscription";
   id: string;
   /** Where deliveries are POSTed. https only. */
@@ -581,6 +623,7 @@ export type WebhookSubscription = {
 
 /** The secret appears in this response only. Store it; it cannot be shown again. */
 export type WebhookSubscriptionCreated = {
+  /** Always `webhook.subscription`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "webhook.subscription";
   /** Ours. Use it to delete the subscription. */
   id: string;
@@ -595,11 +638,13 @@ export type WebhookSubscriptionCreated = {
 };
 
 export type WebhookSubscriptionList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: WebhookSubscription[];
 };
 
 export type WorkspaceFile = {
+  /** Always `workspace_file`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "workspace_file";
   /** Relative to the workspace directory. */
   path: string;
@@ -611,6 +656,7 @@ export type WorkspaceFile = {
 };
 
 export type WorkspaceFileContent = {
+  /** Always `workspace_file.content`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "workspace_file.content";
   path: string;
   /** Unix milliseconds of the snapshot this came from. */
@@ -624,8 +670,10 @@ export type WorkspaceFileContent = {
 
 /** What was written into the workspace. A path that was already there has been overwritten — that is what the request asked for. */
 export type WorkspaceFileList = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: Array<{
+    /** Always `workspace_file`. Names the shape, so a value can be identified without knowing which call returned it. */
     object: "workspace_file";
     path: string;
     size_bytes: number;
@@ -634,6 +682,7 @@ export type WorkspaceFileList = {
 
 /** The files in a session's workspace, as of the last snapshot. Not the live sandbox — `captured_at` says which moment this is, because reading a stale file and believing it current is the failure this field exists to prevent. */
 export type WorkspaceFileTree = {
+  /** Always `list`. Names the shape, so a value can be identified without knowing which call returned it. */
   object: "list";
   data: WorkspaceFile[];
   /** Unix milliseconds of the snapshot. Null means none has been taken, which is not the same as an empty workspace. */

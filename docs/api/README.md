@@ -191,7 +191,15 @@ providers — each written as a sequence you can copy.
 
 The machine-readable reference is `GET /v1/openapi.json` — OpenAPI 3.1, served
 without authentication because it describes the API rather than holding data in
-it. It is generated from the same route table the server matches against, so it
+it. Every `/v1` response points at it:
+
+```
+link: </v1/openapi.json>; rel="service-desc"; type="application/json"
+```
+
+That is there for callers who cannot read this page — an agent has the response
+in front of it and no way to guess a URL, and one header on a call it was
+already making is worth more than a paragraph it will never see. It is generated from the same route table the server matches against, so it
 cannot describe an endpoint that does not exist.
 
 ## How these pages stay true

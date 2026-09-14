@@ -18,6 +18,7 @@ from .._transport import Transport
 
 class Agent(TypedDict):
     object: Literal["agent"]
+    """Always `agent`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     """Ours. Pass it as `agent.id` when creating a session."""
     name: str
@@ -52,21 +53,29 @@ class AgentConfig(TypedDict):
     permission_rules: NotRequired[List[Dict[str, Any]]]
     """Path rules evaluated before a write."""
     tools: NotRequired[List["ToolRequest"]]
+    """What the agent may reach outside the workspace: your own functions, MCP servers, and which built-ins. Everything inside the workspace — shell, files, git — is always there and is not configured here."""
     text: NotRequired["TextConfig"]
+    """Shaping the final message: how much it says, and whether it must conform to a JSON Schema."""
 
 
 class AgentCreateRequest(TypedDict):
     name: str
     """Yours, for recognising it."""
     model: NotRequired[str]
+    """Must be one the chosen credential runs. A session started from this agent may override it."""
     model_credential_id: NotRequired[str]
+    """Omit to use the organization's default."""
     instructions: NotRequired[str]
+    """Standing instructions every session started from this agent begins with."""
     tools: NotRequired[List["ToolRequest"]]
+    """What the agent may reach outside the workspace: your own functions, MCP servers, and which built-ins. Everything inside the workspace — shell, files, git — is always there and is not configured here."""
     text: NotRequired["TextConfig"]
+    """Shaping the final message: how much it says, and whether it must conform to a JSON Schema."""
 
 
 class AgentList(TypedDict):
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["Agent"]
 
 
@@ -81,6 +90,7 @@ class Artifact(TypedDict):
     """An immutable copy of a file a turn published. Survives the sandbox being paused or reclaimed."""
 
     object: Literal["artifact"]
+    """Always `artifact`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     """Ours. Use it to fetch the bytes."""
     session_id: str
@@ -99,6 +109,7 @@ class Artifact(TypedDict):
 
 class ArtifactList(TypedDict):
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["Artifact"]
     has_more: NotRequired[bool]
     last_id: NotRequired[Union[str, None]]
@@ -106,12 +117,14 @@ class ArtifactList(TypedDict):
 
 class Deleted(TypedDict):
     object: Literal["session.deleted"]
+    """Always `session.deleted`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     deleted: bool
 
 
 class EnvironmentProfile(TypedDict):
     object: Literal["environment_profile"]
+    """Always `environment_profile`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     name: str
     is_default: NotRequired[bool]
@@ -120,6 +133,7 @@ class EnvironmentProfile(TypedDict):
 
 class EnvironmentProfileList(TypedDict):
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["EnvironmentProfile"]
 
 
@@ -134,6 +148,7 @@ class EnvironmentTemplate(TypedDict):
     """A named configuration copied into a session at creation. Changing or deleting it does not affect sessions already created from it."""
 
     object: Literal["environment_template"]
+    """Always `environment_template`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     name: str
     tools: NotRequired[List["Tool"]]
@@ -145,6 +160,7 @@ class EnvironmentTemplate(TypedDict):
 
 class EnvironmentTemplateList(TypedDict):
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["EnvironmentTemplate"]
 
 
@@ -175,10 +191,12 @@ class EventsRequest(TypedDict):
     """One event per request. Batching has no meaning while the vocabulary is this small."""
 
     events: List["InputEvent"]
+    """Exactly one event. What it does depends on its `type` — send a message, answer a tool call, approve, steer or cancel."""
 
 
 class FilesRequest(TypedDict):
     files: List["SeedFile"]
+    """Files to write into the running workspace. Same shape as `environment.files`, which seeds one before the first turn."""
 
 
 class Fork(TypedDict):
@@ -192,6 +210,7 @@ class Fork(TypedDict):
 
 class Health(TypedDict):
     object: Literal["health"]
+    """Always `health`. Names the shape, so a value can be identified without knowing which call returned it."""
     status: Literal["ok"]
     version: Literal["v1"]
     scopes: List[Literal["cli", "sessions:read", "sessions:write", "tools:respond", "artifacts:read", "credentials:write"]]
@@ -199,6 +218,7 @@ class Health(TypedDict):
 
 class InputAccepted(TypedDict):
     object: Literal["input.accepted"]
+    """Always `input.accepted`. Names the shape, so a value can be identified without knowing which call returned it."""
     session_id: str
     type: Literal["input.message", "input.cancel", "input.tool_result", "input.steer"]
     outcome: NotRequired[Literal["accepted", "already_resolved", "not_delivered"]]
@@ -232,6 +252,7 @@ class InputEvent(TypedDict):
 
 class Item(TypedDict):
     object: Literal["item"]
+    """Always `item`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     """Ours. Stable; use it as a paging cursor."""
     session_id: str
@@ -250,6 +271,7 @@ class Item(TypedDict):
 
 class ItemList(TypedDict):
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["Item"]
     has_more: NotRequired[bool]
     last_id: NotRequired[Union[str, None]]
@@ -257,6 +279,7 @@ class ItemList(TypedDict):
 
 class ModelConnector(TypedDict):
     object: Literal["model_connector"]
+    """Always `model_connector`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     """What to send as `provider` when connecting a key."""
     display_name: str
@@ -275,11 +298,13 @@ class ModelConnectorCatalog(TypedDict):
     """The model providers this deployment can connect. Served without a token, like the OpenAPI document: it describes what the API supports rather than anything inside an organization."""
 
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["ModelConnector"]
 
 
 class ModelCredential(TypedDict):
     object: Literal["model_credential"]
+    """Always `model_credential`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     """Pass as agent.model_credential_id."""
     label: NotRequired[str]
@@ -313,6 +338,7 @@ class ModelCredentialCreateRequest(TypedDict):
 
 class ModelCredentialList(TypedDict):
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["ModelCredential"]
 
 
@@ -325,6 +351,7 @@ class ModelCredentialsListQuery(TypedDict):
 
 class Preview(TypedDict):
     object: Literal["preview"]
+    """Always `preview`. Names the shape, so a value can be identified without knowing which call returned it."""
     subdomain: str
     """The label the site is served under."""
     url: str
@@ -335,6 +362,7 @@ class Preview(TypedDict):
 
 class PreviewDeleted(TypedDict):
     object: Literal["preview.deleted"]
+    """Always `preview.deleted`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     deleted: bool
 
@@ -376,6 +404,7 @@ class SeedFile(TypedDict):
 
 class Session(TypedDict):
     object: Literal["session"]
+    """Always `session`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     """Ours, not yours. Use `metadata` to carry your own identifier."""
     title: NotRequired[Union[str, None]]
@@ -419,6 +448,7 @@ class SessionCreateRequest(TypedDict):
     """Everything optional. A session with only a model is a complete session."""
 
     agent: NotRequired["AgentConfig"]
+    """What runs, and how freely. Omit every field and the organization's default connection runs it."""
     environment: NotRequired["SessionCreateRequestEnvironment"]
     """What the workspace starts with."""
     metadata: NotRequired[Dict[str, str]]
@@ -466,6 +496,7 @@ class SessionEnvironmentRepo(TypedDict):
 
 class SessionList(TypedDict):
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["Session"]
     has_more: NotRequired[bool]
     last_id: NotRequired[Union[str, None]]
@@ -475,19 +506,26 @@ class SessionPatchRequest(TypedDict):
     """Only the fields present are changed."""
 
     title: NotRequired[Union[str, None]]
+    """`null` clears it."""
     metadata: NotRequired[Union[Dict[str, str], None]]
     """`null` clears every label."""
     agent: NotRequired["SessionPatchRequestAgent"]
+    """Change what runs, mid-session. The workspace and the transcript are kept either way."""
 
 
 class SessionPatchRequestAgent(TypedDict):
+    """Change what runs, mid-session. The workspace and the transcript are kept either way."""
+
     model: NotRequired[str]
     """Move this running session to another connection. Send with `model_credential_id`; the workspace and the transcript are kept."""
     model_credential_id: NotRequired[str]
     """The connection to move to. It must offer the named model — one connection runs one model."""
     instructions: NotRequired[Union[str, None]]
+    """Standing instructions from the next turn on. `null` clears an inherited one."""
     approval_mode: NotRequired[Literal["auto", "per_step", "read_only", "plan"]]
+    """How much the agent may do without asking, from the next turn on."""
     permission_rules: NotRequired[List[Dict[str, Any]]]
+    """Path rules evaluated before a write. Replaces the existing rules rather than adding to them."""
 
 
 class SessionPreview(TypedDict):
@@ -588,6 +626,7 @@ class Tool(TypedDict):
 
 class ToolConfig(TypedDict):
     object: Literal["session.tools"]
+    """Always `session.tools`. Names the shape, so a value can be identified without knowing which call returned it."""
     session_id: str
     """The session this configuration applies to."""
     tools: NotRequired[List["Tool"]]
@@ -636,11 +675,14 @@ class ToolsRequest(TypedDict):
     """What the agent may call. Replaces the session's whole configuration — entries are not merged with what is already there."""
 
     tools: NotRequired[List["ToolRequest"]]
+    """What the agent may reach outside the workspace: your own functions, MCP servers, and which built-ins. Everything inside the workspace — shell, files, git — is always there and is not configured here. An empty array leaves the session with no route to the network at all."""
     text: NotRequired["TextConfig"]
+    """Shaping the final message: how much it says, and whether it must conform to a JSON Schema."""
 
 
 class Turn(TypedDict):
     object: Literal["turn"]
+    """Always `turn`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     """Ours. Quote it when reporting a problem with this turn."""
     session_id: str
@@ -672,6 +714,7 @@ class TurnArtifactsSkippedItem(TypedDict):
 
 class TurnList(TypedDict):
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["Turn"]
     has_more: NotRequired[bool]
     last_id: NotRequired[Union[str, None]]
@@ -701,6 +744,7 @@ class WebhookSubscription(TypedDict):
     """An endpoint subscribed to session events. The secret is returned only when it is created."""
 
     object: Literal["webhook.subscription"]
+    """Always `webhook.subscription`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     url: str
     """Where deliveries are POSTed. https only."""
@@ -716,6 +760,7 @@ class WebhookSubscriptionCreated(TypedDict):
     """The secret appears in this response only. Store it; it cannot be shown again."""
 
     object: Literal["webhook.subscription"]
+    """Always `webhook.subscription`. Names the shape, so a value can be identified without knowing which call returned it."""
     id: str
     """Ours. Use it to delete the subscription."""
     url: str
@@ -730,6 +775,7 @@ class WebhookSubscriptionCreated(TypedDict):
 
 class WebhookSubscriptionList(TypedDict):
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["WebhookSubscription"]
 
 
@@ -742,6 +788,7 @@ class WebhooksListQuery(TypedDict):
 
 class WorkspaceFile(TypedDict):
     object: Literal["workspace_file"]
+    """Always `workspace_file`. Names the shape, so a value can be identified without knowing which call returned it."""
     path: str
     """Relative to the workspace directory."""
     type: Literal["file", "directory"]
@@ -753,6 +800,7 @@ class WorkspaceFile(TypedDict):
 
 class WorkspaceFileContent(TypedDict):
     object: Literal["workspace_file.content"]
+    """Always `workspace_file.content`. Names the shape, so a value can be identified without knowing which call returned it."""
     path: str
     captured_at: NotRequired[int]
     """Unix milliseconds of the snapshot this came from."""
@@ -767,11 +815,13 @@ class WorkspaceFileList(TypedDict):
     """What was written into the workspace. A path that was already there has been overwritten — that is what the request asked for."""
 
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["WorkspaceFileListDataItem"]
 
 
 class WorkspaceFileListDataItem(TypedDict):
     object: Literal["workspace_file"]
+    """Always `workspace_file`. Names the shape, so a value can be identified without knowing which call returned it."""
     path: str
     size_bytes: int
 
@@ -780,6 +830,7 @@ class WorkspaceFileTree(TypedDict):
     """The files in a session's workspace, as of the last snapshot. Not the live sandbox — `captured_at` says which moment this is, because reading a stale file and believing it current is the failure this field exists to prevent."""
 
     object: Literal["list"]
+    """Always `list`. Names the shape, so a value can be identified without knowing which call returned it."""
     data: List["WorkspaceFile"]
     captured_at: NotRequired[Union[int, None]]
     """Unix milliseconds of the snapshot. Null means none has been taken, which is not the same as an empty workspace."""
