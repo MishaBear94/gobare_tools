@@ -1,5 +1,9 @@
 # Agents
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/agents> — read it there; this copy is for offline and for tooling.
+
+
 A named, reusable configuration to start sessions from. Save the model,
 instructions and tools once, then create sessions that inherit them.
 

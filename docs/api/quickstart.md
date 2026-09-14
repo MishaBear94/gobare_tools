@@ -1,5 +1,9 @@
 # Quickstart
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/quickstart> — read it there; this copy is for offline and for tooling.
+
+
 From nothing to a completed turn. Every call below is one this API actually
 answers; the sequence is the one the release acceptance runs.
 

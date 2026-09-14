@@ -1,5 +1,9 @@
 # Tools
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/tools> — read it there; this copy is for offline and for tooling.
+
+
 Two kinds, and they differ in where the code runs.
 
 | | Runs where | Use it for |

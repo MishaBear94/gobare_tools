@@ -1,5 +1,9 @@
 # Idempotency
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/idempotency> — read it there; this copy is for offline and for tooling.
+
+
 A retried write must not act twice. Send an `Idempotency-Key` header on any
 request that changes something, and a retry with the same key returns the
 stored answer instead of doing the work again.

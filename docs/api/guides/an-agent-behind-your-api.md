@@ -1,5 +1,9 @@
 # Put an agent behind your own API
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/guides/an-agent-behind-your-api> — read it there; this copy is for offline and for tooling.
+
+
 Your service takes a request, hands the work to an agent, and answers
 immediately. Minutes later the agent finishes, your code collects the result,
 and whoever asked gets told.

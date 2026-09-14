@@ -1,5 +1,9 @@
 # Required actions
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/required-actions> — read it there; this copy is for offline and for tooling.
+
+
 How the agent calls *your* code. This is the one genuinely unusual thing in this
 API, and the one nobody guesses from the endpoint list.
 

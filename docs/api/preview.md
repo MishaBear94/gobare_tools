@@ -1,5 +1,9 @@
 # Preview
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/preview> — read it there; this copy is for offline and for tooling.
+
+
 The agent starts a server in its workspace. You publish it, and someone who has
 never heard of Gobare opens a URL and sees it.
 

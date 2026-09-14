@@ -1,5 +1,9 @@
 # Pagination
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/pagination> — read it there; this copy is for offline and for tooling.
+
+
 Every collection in this API pages the same way, so learning it once is enough.
 This page also covers the two filters on `GET /v1/sessions`, which are what a
 restarted process asks first.

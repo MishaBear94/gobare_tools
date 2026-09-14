@@ -1,5 +1,9 @@
 # Errors
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/errors> — read it there; this copy is for offline and for tooling.
+
+
 Every failure has the same shape:
 
 ```json

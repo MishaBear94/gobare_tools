@@ -1,5 +1,9 @@
 # Events
 
+> Published from the Gobare product repository. The canonical page is
+> <https://docs.gobare.dev/events> — read it there; this copy is for offline and for tooling.
+
+
 Server-sent events, resumable. Two streams:
 
 | | |
