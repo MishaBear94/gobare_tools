@@ -1,0 +1,23 @@
+{
+  // The published client is JavaScript with declarations beside it.
+  //
+  // It shipped raw `.ts` with `exports` pointing at `src/index.ts`, which works
+  // under tsx, bun and any bundler — and fails under plain `node`, because Node
+  // does not strip types inside `node_modules`. `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`
+  // on the first import is not a first minute anyone should have.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": ".build-src",
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [".build-src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

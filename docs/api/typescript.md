@@ -5,10 +5,16 @@ Everything on the other pages is a `curl`, because the API is the product and
 are putting it in a service and want the compiler to catch what a prose warning
 cannot.
 
-**Not on npm yet.** `/v1` is still making breaking changes, so the package is
-published when the surface settles rather than before. This page is what it
-does and what each call becomes; until then, the
-[guides](guides/README.md) are the same loop with no dependency at all.
+```bash
+git clone https://github.com/MishaBear94/gobare_tools.git
+npm install ./gobare_tools/sdk/ts
+```
+
+**Not on npm yet** — `/v1` is still making breaking changes, so the package is
+published to a registry when the surface settles rather than before. It is on
+GitHub now, and npm cannot install a subdirectory from a git URL, which is why
+this is two lines rather than one. The install builds it: you get JavaScript
+with declarations, importable from plain `node`, not the TypeScript source.
 
 ```ts
 import { Gobare } from "@gobare/api";

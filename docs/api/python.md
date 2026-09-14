@@ -5,11 +5,14 @@ Everything on the other pages is a `curl`, because the API is the product and
 are putting it in a service and would rather import the five guards below than
 re-read the warnings that describe them.
 
-**Not on PyPI yet.** `/v1` is still making breaking changes, so the package is
-published when the surface settles rather than before. This page is what it
-does and what each call becomes; until then, the
-[guides](guides/README.md) are the same loop with no dependency at all — every
-one of them is a runnable Python program.
+```bash
+pip install "gobare @ git+https://github.com/MishaBear94/gobare_tools#subdirectory=sdk/python"
+```
+
+**Not on PyPI yet** — `/v1` is still making breaking changes, so the package is
+published to an index when the surface settles rather than before. It is on
+GitHub now, which is what the line above installs, and it is the same code:
+the public repository is a mirror of the one the API is built in.
 
 ```python
 import os
