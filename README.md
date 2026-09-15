@@ -10,14 +10,15 @@ including environment variables, automatic cloud restore, retry, and export, see
 ## Agent API
 
 The CLI is one way to reach Gobare. The other is the **Agent API**: create a session, send it
-work, and read what the agent did, from your own code. Its documentation lives here — a
-quickstart, the event and webhook contracts, the required-action loop, the limits, and the
-deliberate differences from OpenAI's Agents API:
+work, and read what the agent did, from your own code. Its documentation used to be mirrored
+here, under `docs/api`; it moved to its own repository when the site moved to Mintlify, which
+watches a dedicated repository rather than a subdirectory:
 
-**[docs/api](./docs/api/)** · machine-readable reference at `https://api.gobare.dev/v1/openapi.json`
+**<https://docs.gobare.dev>** · source at [MishaBear94/gobare_docs](https://github.com/MishaBear94/gobare_docs)
+· machine-readable reference at `https://api.gobare.dev/v1/openapi.json`
 
-Those pages are published from the Gobare product repository, where they are checked against the
-code they describe. Corrections belong there rather than here.
+Both are published from the Gobare product repository, where they are checked against the code
+they describe. Corrections belong there rather than in either mirror.
 
 ## Development
 
