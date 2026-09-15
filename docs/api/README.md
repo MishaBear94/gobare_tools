@@ -7,15 +7,12 @@
 you — an agent with a computer, that writes files, runs them, and leaves what it
 built at a URL you can open.
 
-```
-Your application
-     │  one API call
-     ▼
-   Gobare ──► coding agent ──► a cloud computer
-                                ├── a real workspace
-                                ├── a shell it installs and runs in
-                                ├── your tools: functions, MCP
-                                └── a public URL for what it built
+```mermaid
+flowchart TD
+  app["Your application"] -- "one API call" --> gobare["Gobare"]
+  gobare --> agent["coding agent"]
+  agent --> computer["a cloud computer"]
+  computer --> parts["a real workspace<br/>a shell it installs and runs in<br/>your tools: functions, MCP<br/>a public URL for what it built"]
 ```
 
 **You bring the model key.** Gobare does not sell you inference — it runs an
@@ -103,20 +100,25 @@ You need a token for this. It takes a minute and the
 
 Five nouns, and they nest:
 
+```mermaid
+flowchart TD
+  agent["Agent"] -. "optional" .-> session["Session"]
+  session --> turn["Turn"]
+  turn --> items["Items"]
+  turn --> events["Events"]
+  turn --> artifacts["Artifacts"]
+  turn --> preview["Preview"]
 ```
-Agent      a named configuration: model, instructions, tools
-  │        (optional — a session can carry its own)
-  ▼
-Session    one cloud computer. Its workspace persists between
-  │        rounds and survives being paused
-  ▼
-Turn       one piece of work, from your message until it settles
-  │
-  ├──► Items      the record: messages, tool calls, file changes
-  ├──► Events     the same, as it happens: streamable, resumable
-  ├──► Artifacts  files it published — they outlive the computer
-  └──► Preview    a port it serves, optionally at a public URL
-```
+
+- **Agent** — a named configuration: model, instructions, tools. Optional; a
+  session can carry its own.
+- **Session** — one cloud computer. Its workspace persists between rounds and
+  survives being paused.
+- **Turn** — one piece of work, from your message until it settles.
+- **Items** — the record: messages, tool calls, file changes.
+- **Events** — the same, as it happens: streamable, resumable.
+- **Artifacts** — files it published; they outlive the computer.
+- **Preview** — a port it serves, optionally at a public URL.
 
 The session is the thing to hold on to. Everything else is reached through it,
 and a session you created yesterday still answers today — its computer may have
